@@ -1,4 +1,4 @@
-
+;;; -*- lexical-binding: t -*-
 
 ;;; Utils
 
@@ -143,30 +143,58 @@
   (set-buffer-file-coding-system 'utf-8)
   (setq-default file-name-coding-system 'utf-8))
 
-(defun configure-ui ()
-  "Configure default UI."
+(defun configure-frame-default ()
+  "Configure default ui and frame size."
   (tool-bar-mode -1)
   (menu-bar-mode -1)
   (scroll-bar-mode -1)
   (tooltip-mode -1)
+  (set-frame-width (selected-frame) 86)
+  (set-frame-height (selected-frame) 33))
+
+(defun configure-ui ()
+  "Configure default UI."
   (setq frame-title-format "emacs@%b")
   (mouse-avoidance-mode 'animate)
   (setq column-number-mode t)
-  (set-frame-width (selected-frame) 86)
-  (set-frame-height (selected-frame) 33)
   (set-background-color "snow")
+  (set-face-attribute 'default nil :family "Consolas")
+  (set-face-attribute 'default nil :height 100)
+  (set-face-attribute 'default nil :foreground "#2e3137")
+  (set-face-attribute 'fringe nil
+                      :foreground (face-foreground 'default)
+                      :background (face-background 'default))
   (require-or-install 'fill-column-indicator)
   (fci-mode 1)
   (setq fill-column 80)
   (setq-default fci-rule-column 80)
   (setq-default indent-tabs-mode nil))
 
+(defun on-tab-title-press (button)
+  (message (format "Button pressed!")))
 
+(define-button-type 'startup-tab-title
+  'action 'on-tab-title-press
+  'follow-link t
+  'help-echo "Click Button"
+  'help-args "test")
+
+(defun render-list-todos ()
+  "Render todos list.
+
+● foo
+● bar
+"
+  (s-join "\n"
+   (-map (lambda (item)
+           (concat "○" " " item)
+           ) (list "foo" "bar" "baz" "qux")))
+  )
 
 (defun configure-startup-screen ()
   "Render startup screen."
   (setq inhibit-startup-screen t)
-  (let ((buffer-name "*Hairy*")
+  (let ((hairy-buffer-name "*Hairy*")
         (window (selected-window))
         (window-width (window-body-width))
         (window-height (window-body-height))
@@ -178,61 +206,88 @@
         (char-\Y (set-font-color "Y" "plum"))
         (char-\R (set-font-color "R" "purple"))
         (char-\B (set-font-color "B" "salmon"))
-        (hr-left-pad "                             ")
-        (hr (set-font-color "__________" "lightgray"))
-        (word-left-pad "                                  ")
-        (word-emacs (set-font-color "emacs" "thistle"))
-        )
+        (hr (s-pad-left 39 " " (set-font-color "__________" "lightgray")))
+        (word-emacs (s-pad-left 40 " " (set-font-color "ξmacs" "thistle")))
+        (body-point 0))
     (save-current-buffer
-      (when (get-buffer buffer-name)
-        (kill-buffer buffer-name))
-      (generate-new-buffer buffer-name)
-      (set-buffer (get-buffer-create buffer-name))
+      (when (get-buffer hairy-buffer-name)
+        (kill-buffer hairy-buffer-name))
+      (generate-new-buffer hairy-buffer-name)
+      (set-buffer (get-buffer-create hairy-buffer-name))
       (font-lock-mode nil)
       (setq mode-line-format nil)
 
-      (let* ((sw (selected-window))
-             (cw (window-body-width))
-             (ch (window-body-height))
-             )
-        ;;          . f:/rabbitlive/eth
-        ;;          . f:/rabbitlive/rabbitmacs
-        ;;          . f:/hairy
+      (newline (- (/ window-height 2) 1))
+      (insert (s-center window-width (concat char-\[
+                                             "  "
+                                             char-\H
+                                             "  "
+                                             char-\A
+                                             "  "
+                                             "I"
+                                             "  "
+                                             "R"
+                                             "  "
+                                             char-\Y
+                                             "  "
+                                             char-\]
+                                             "     "
+                                             char-\R
+                                             "  "
+                                             "A"
+                                             "  "
+                                             "B"
+                                             "  "
+                                             char-\B
+                                             "  "
+                                             char-\I
+                                             "  "
+                                             "T")))
+      (newline 1)
+      (insert (s-center window-width hr))
+      (newline 1)
+      (insert (s-center window-width word-emacs))
+      (newline 4)
+      (insert (s-repeat (/ (- window-width 36) 2) " "))
+      (insert-text-button (set-font-color "[T]" "purple")
+                          'action (lambda (_button)
+                                    (delete-region body-point (buffer-end 1))
+                                    ))
+      (insert "odos")
+      (insert (s-repeat 6 " "))
+      (insert-text-button (set-font-color "[P]" "plum")
+                          'help-echo "Start coding…"
+                          'action (lambda (_button)
+                                    (delete-region body-point (buffer-end 1))
+                                    ))
+      (insert "rojects")
+      (insert (s-repeat 6 " "))
+      (insert-text-button (set-font-color "[B]" "SlateBlue")
+                          'action (lambda (_button)
+                                    (delete-region body-point (buffer-end 1))
+                                    ))
+      (insert "logs")
+      (newline)
+      ;; (newline 4)
+      ;; <Body>
+      (setq body-point (point))
+      ;; (insert (render-list-todos))
+      ;; (insert (s-center window-width "[ ] foo"))
+      ;; (newline)
+      ;; (insert (s-center window-width "[x] foo"))
 
-        (newline (- (/ window-height 2) 1))
-        (insert (s-center window-width (concat char-\[
-                                               "  "
-                                               char-\H
-                                               "  "
-                                               char-\A
-                                               "  "
-                                               "I"
-                                               "  "
-                                               "R"
-                                               "  "
-                                               char-\Y
-                                               "  "
-                                               char-\]
-                                               "     "
-                                               char-\R
-                                               "  "
-                                               "A"
-                                               "  "
-                                               "B"
-                                               "  "
-                                               char-\B
-                                               "  "
-                                               char-\I
-                                               "  "
-                                               "T")))
-        (insert "\n")
-        (insert (s-center window-width (concat hr-left-pad hr)))
-        (insert "\n")
-        (insert (s-center window-width (concat word-left-pad word-emacs)))
-        (insert "\n")
-        ))
+      (newline 1)
+      ;;(read-only-mode 1)
+      )
     (setq initial-buffer-choice (lambda () (get-buffer "*Hairy*")))
-    )
+    ))
+
+(defun configure-restart-emacs ()
+  "Restart emacs"
+  (require-or-install 'restart-emacs)
+  (setq restart-emacs-restore-frames t)
+  ;; (setq restart-emacs--args "-q --load f:\\hairy\\hairy.el")
+  ;; TODO
   )
 
 (deftask editor
@@ -241,8 +296,10 @@
   (configure-auto-file)
   (configure-buffer)
   (configure-conding-system)
+  (configure-frame-default)
   (configure-ui)
   (configure-startup-screen)
+  (configure-restart-emacs)
   (setq visible-bell t))
 
 
@@ -423,3 +480,14 @@
   (run-with-timer (ms 100) nil 'lang-http))
 
 
+
+;;; AutoHotKey
+
+(defun lang-ahk ()
+  ""
+  (require-or-install 'ahk-mode)
+  )
+
+(deftask javascript
+  "Apply javascript-IDE configs."
+  (run-with-timer (ms 100) nil 'lang-ahk))
