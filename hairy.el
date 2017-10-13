@@ -44,11 +44,13 @@
   (setq package-archives (configure-package-sources))
   (package-initialize))
 
-(defun require-or-install (feature &optional filename)
+(defun require-or-install (feature &optional filename unstable)
   "Install package when require failed."
   (unless (funcall 'require feature filename t)
     (progn
-      (package-install feature)
+      (if unstable
+          (package-install-from-archive feature)
+        (package-install feature))
       (funcall 'require feature filename))))
 
 (defun maximize-emacs ()
@@ -414,9 +416,17 @@
 
 ;;; Projects
 
+(defun configure-icons ()
+  "Configure icon font"
+  ;; (require-or-install 'all-the-icons)
+  ;; (all-the-icons-install-fonts)
+  )
+
 (defun configure-project ()
   ""
+  (configure-icons)
   (require-or-install 'projectile)
+  (require-or-install 'neotree)
   (require-or-install 'ag))
 
 (deftask project
