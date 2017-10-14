@@ -224,30 +224,33 @@
     (insert-text-button (set-font-color fst color) 'action onpress)
     (insert tails)))
 
-(defun render-preset-project-layout ()
+(defun layout-project ()
   "Render default project layout, when press 'project' link."
+  (interactive)
   (let* ((buf-name "*Empty Code Layout*"))
+    (maximize-emacs)
     (save-current-buffer
       (generate-new-buffer buf-name)
-      (set-buffer (get-buffer-create buf-name)))
+      (switch-to-buffer (get-buffer-create buf-name))
+      (split-window-right)
+      (split-window-below)
+      )
     ))
 
 (defun render-nav ()
   "Render navigator."
   (render-nav-item "todos" "purple" (lambda (_btn) (print 42)))
   (insert (s-repeat 6 " "))
-  (render-nav-item "projects" "plum"
-                   (lambda (_btn)
-                     (render-preset-project-layout)))
+  (render-nav-item "projects" "plum" (lambda (_btn) (layout-project)))
   (insert (s-repeat 6 " "))
   (render-nav-item "blog" "SlateBlue" (lambda (_btn) (print 42))))
 
 (define-derived-mode hairy-mode
-  text-mode "Hairy"
+  fundamental-mode "Hairy"
   "Hairy Rabbit emacs greeting."
   (read-only-mode 1)
-  (define-key hairy-mode-map (kbd "p") 'render-preset-project-layout)
-  )
+  (define-key hairy-mode-map (kbd "p") 'layout-project))
+
 
 
 (defun configure-greeting ()
