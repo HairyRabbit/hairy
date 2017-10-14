@@ -1,4 +1,4 @@
-;;; -*- lexical-binding: t -*-
+;;; hairy.el --- Hairy Rabbit  -*- lexical-binding: t -*-
 
 ;;; Utils
 
@@ -139,11 +139,19 @@
 
 (defun configure-conding-system ()
   "Use utf-8 coding system."
+  (setq utf-translate-cjk-mode nil)
   (prefer-coding-system 'utf-8)
   (set-language-environment "UTF-8")
   (set-default-coding-systems 'utf-8)
   (set-buffer-file-coding-system 'utf-8)
-  (setq-default file-name-coding-system 'utf-8))
+  (set-terminal-coding-system 'utf-8)
+  (set-keyboard-coding-system 'utf-8)
+  (set-selection-coding-system 'utf-8)
+  (setq locale-coding-system 'utf-8)
+  (setq coding-system-for-read 'utf-8)
+  (setq coding-system-for-write 'utf-8)
+  (setq-default buffer-file-coding-system 'utf-8-unix)
+  (setq-default file-name-coding-system 'utf-8-unix))
 
 (defun configure-frame-default ()
   "Configure default ui and frame size."
@@ -172,15 +180,6 @@
   (setq-default fci-rule-column 80)
   (setq-default indent-tabs-mode nil))
 
-(defun on-tab-title-press (button)
-  (message (format "Button pressed!")))
-
-(define-button-type 'startup-tab-title
-  'action 'on-tab-title-press
-  'follow-link t
-  'help-echo "Click Button"
-  'help-args "test")
-
 (defun render-list-todos ()
   "Render todos list.
 
@@ -193,23 +192,71 @@
            ) (list "foo" "bar" "baz" "qux")))
   )
 
-(defun configure-startup-screen ()
-  "Render startup screen."
-  (setq inhibit-startup-screen t)
-  (let ((hairy-buffer-name "*Hairy*")
-        (window (selected-window))
-        (window-width (window-body-width))
-        (window-height (window-body-height))
-        (char-\[ (set-font-color "[" "lightgray"))
+(defun render-banner ()
+  "Render banner at startup buffer."
+  (let ((char-\[ (set-font-color "[" "lightgray"))
         (char-\] (set-font-color "]" "lightgray"))
         (char-\H (set-font-color "H" "SlateBlue"))
         (char-\A (set-font-color "A" "DeepSkyBlue"))
         (char-\I (set-font-color "I" "DodgerBlue"))
         (char-\Y (set-font-color "Y" "plum"))
         (char-\R (set-font-color "R" "purple"))
-        (char-\B (set-font-color "B" "salmon"))
-        (hr (s-pad-left 39 " " (set-font-color "__________" "lightgray")))
-        (word-emacs (s-pad-left 40 " " (set-font-color "ξmacs" "thistle")))
+        (char-\B (set-font-color "B" "salmon")))
+    (s-join "  " (list char-\[ char-\H char-\A "I" "R" char-\Y char-\]
+                       " "
+                       char-\R "A" "B" char-\B char-\I "T" ))))
+
+(defun render-hr ()
+  "Render hr at below banner."
+  (s-pad-left 39 " " (set-font-color "__________" "lightgray")))
+
+(defun render-small ()
+  "Render small below banner."
+  (s-pad-left 40 " " (set-font-color "echo" "DodgerBlue")))
+
+(defun render-nav-item (str color onpress)
+  "Render Navigator item."
+  (let* ((arr (s-split "" str t))
+         (fst (s-wrap (car arr) "[" "]"))
+         (tails (s-join "" (cdr arr))))
+    (print fst)
+    (print tails)
+    (insert-text-button (set-font-color fst color) 'action onpress)
+    (insert tails)))
+
+(defun render-preset-project-layout ()
+  "Render default project layout, when press 'project' link."
+  (let* ((buf-name "*Empty Code Layout*"))
+    (save-current-buffer
+      (generate-new-buffer buf-name)
+      (set-buffer (get-buffer-create buf-name)))
+    ))
+
+(defun render-nav ()
+  "Render navigator."
+  (render-nav-item "todos" "purple" (lambda (_btn) (print 42)))
+  (insert (s-repeat 6 " "))
+  (render-nav-item "projects" "plum"
+                   (lambda (_btn)
+                     (render-preset-project-layout)))
+  (insert (s-repeat 6 " "))
+  (render-nav-item "blog" "SlateBlue" (lambda (_btn) (print 42))))
+
+(define-derived-mode hairy-mode
+  text-mode "Hairy"
+  "Hairy Rabbit emacs greeting."
+  (read-only-mode 1)
+  (define-key hairy-mode-map (kbd "p") 'render-preset-project-layout)
+  )
+
+
+(defun configure-greeting ()
+  "Render startup screen."
+  (setq inhibit-startup-screen t)
+  (let ((hairy-buffer-name "*Hairy*")
+        (window (selected-window))
+        (window-width (window-body-width))
+        (window-height (window-body-height))
         (body-point 0))
     (save-current-buffer
       (when (get-buffer hairy-buffer-name)
@@ -218,71 +265,23 @@
       (set-buffer (get-buffer-create hairy-buffer-name))
       (font-lock-mode nil)
       (setq mode-line-format nil)
-
       (newline (- (/ window-height 2) 1))
-      (insert (s-center window-width (concat char-\[
-                                             "  "
-                                             char-\H
-                                             "  "
-                                             char-\A
-                                             "  "
-                                             "I"
-                                             "  "
-                                             "R"
-                                             "  "
-                                             char-\Y
-                                             "  "
-                                             char-\]
-                                             "     "
-                                             char-\R
-                                             "  "
-                                             "A"
-                                             "  "
-                                             "B"
-                                             "  "
-                                             char-\B
-                                             "  "
-                                             char-\I
-                                             "  "
-                                             "T")))
-      (newline 1)
-      (insert (s-center window-width hr))
-      (newline 1)
-      (insert (s-center window-width word-emacs))
+      (insert (s-center window-width (render-banner)))
+      (newline)
+      (insert (s-center window-width (render-hr)))
+      (newline)
+      (insert (s-center window-width (render-small)))
       (newline 4)
       (insert (s-repeat (/ (- window-width 36) 2) " "))
-      (insert-text-button (set-font-color "[T]" "purple")
-                          'action (lambda (_button)
-                                    (delete-region body-point (buffer-end 1))
-                                    ))
-      (insert "odos")
-      (insert (s-repeat 6 " "))
-      (insert-text-button (set-font-color "[P]" "plum")
-                          'help-echo "Start coding…"
-                          'action (lambda (_button)
-                                    (delete-region body-point (buffer-end 1))
-                                    ))
-      (insert "rojects")
-      (insert (s-repeat 6 " "))
-      (insert-text-button (set-font-color "[B]" "SlateBlue")
-                          'action (lambda (_button)
-                                    (delete-region body-point (buffer-end 1))
-                                    ))
-      (insert "logs")
+      (render-nav)
       (newline)
-      ;; (newline 4)
-      ;; <Body>
-      (setq body-point (point))
-      ;; (insert (render-list-todos))
-      ;; (insert (s-center window-width "[ ] foo"))
-      ;; (newline)
-      ;; (insert (s-center window-width "[x] foo"))
-
-      (newline 1)
-      ;;(read-only-mode 1)
-      )
-    (setq initial-buffer-choice (lambda () (get-buffer "*Hairy*")))
-    ))
+      ;; TODO Add package upgrade info.
+      ;; (setq body-point (point))
+      ;; (delete-region body-point (buffer-end 1))
+      (hairy-mode))
+    ;; (define-key company-active-map (kbd "p") 'render-preset-project-layout)
+    ;; (set-buffer-major-mode )
+    (setq initial-buffer-choice (lambda () (get-buffer "*Hairy*")))))
 
 (defun configure-restart-emacs ()
   "Restart emacs"
@@ -300,7 +299,7 @@
   (configure-conding-system)
   (configure-frame-default)
   (configure-ui)
-  (configure-startup-screen)
+  (configure-greeting)
   (configure-restart-emacs)
   (setq visible-bell t))
 
@@ -422,12 +421,39 @@
   ;; (all-the-icons-install-fonts)
   )
 
+(defun configure-perspective ()
+  "Configure perspective."
+  ()
+  )
+
+(defun configure-eshell ()
+  (require 'eshell)
+
+  )
+
+(defun repl-open ()
+  "Open REPL buffer"
+  (interactive)
+  (let ((buf-name "*REPL*"))
+
+    ))
+
+(defun configure-repl ()
+  "Configure REPL
+1. eshell/cmd/powershell/bashOnWindows/gitbash/cygwin
+2. lang layer, nodejs python3 etc..
+"
+  (global-set-key (kbd "C-M-'") 'repl-open)
+  )
+
 (defun configure-project ()
   ""
+  (configure-perspective)
   (configure-icons)
   (require-or-install 'projectile)
   (require-or-install 'neotree)
-  (require-or-install 'ag))
+  (require-or-install 'ag)
+  (configure-repl))
 
 (deftask project
   "Apply project configs."
@@ -462,12 +488,33 @@
   (add-to-list 'auto-mode-alist '("\\.babelrc" . json-mode))
   (add-to-list 'auto-mode-alist '("\\.eslintrc" . json-mode)))
 
+(defun configure-electric-operator ()
+  "Configure electric operator."
+  (require-or-install 'electric-operator)
+  (electric-operator-add-rules-for-mode 'js-mode
+                                        (cons "let"   "let ")
+                                        (cons "const" "const ")
+                                        (cons "var"   "var ")
+                                        ;; (cons "if" "if ")
+                                        ;; (cons "for" "for ")
+                                        ;; (cons "while" "while ")
+                                        (cons "switch" "switch ")
+                                        (cons "case" "case ")
+                                        (cons "new" "new ")
+                                        (cons "type" "type ")
+                                        (cons "interface" "interface ")
+                                        )
+  (add-hook 'js-mode-hook 'electric-operator-mode)
+  ;; (add-hook 'js-mode-hook 'electric-layout-mode)
+  (add-hook 'js-mode-hook 'electric-pair-mode))
+
 (defun lang-javascript ()
   "Configure javascript mode."
   ;; Nodejs-repl
   (configure-nodejs-repl)
   ;; Json
   (configure-json-mode)
+  (configure-electric-operator)
   ;; Templates
   ;;()
   )
