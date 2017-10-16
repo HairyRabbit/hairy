@@ -247,11 +247,18 @@
 ;; w2:
 ;;
 ;;;
+(defvar layout-project-window-sidebar nil)
+(defvar layout-project-window-body nil)
+(defvar layout-project-window-project nil)
 (defvar layout-project-window-workspace nil)
 (defvar layout-project-window-explorer nil)
-(defvar layout-project-window-terminal nil)
+(defvar layout-project-window-code nil)
 (defvar layout-project-window-code1 nil)
 (defvar layout-project-window-code2 nil)
+(defvar layout-project-window-terminal nil)
+(defvar layout-project-window-scm nil)
+(defvar layout-project-window-other nil)
+
 
 (defun neotree-projectile ()
   "Open neotree with projectile as root and open node for current file.
@@ -276,59 +283,59 @@ If file path is not available, open $HOME."
             (neo-buffer--select-file-node file-name)))))))
 
 
-(defvar endless/popup-frame-parameters
-  '((name . "MINIBUFFER")
-    (minibuffer . only)
-    (height . 1)
-    ;; Ajust this one to your preference.
-    (top . 200))
-  "Parameters for the minibuffer popup frame.")
+;; (defvar endless/popup-frame-parameters
+;;   '((name . "MINIBUFFER")
+;;     (minibuffer . only)
+;;     (height . 1)
+;;     ;; Ajust this one to your preference.
+;;     (top . 200))
+;;   "Parameters for the minibuffer popup frame.")
 
-(defvar endless/minibuffer-frame
-  (let ((mf (make-frame endless/popup-frame-parameters)))
-    (iconify-frame mf) mf)
-  "Frame holding the extra minibuffer.")
+;; (defvar endless/minibuffer-frame
+;;   (let ((mf (make-frame endless/popup-frame-parameters)))
+;;     (iconify-frame mf) mf)
+;;   "Frame holding the extra minibuffer.")
 
-(defvar endless/minibuffer-window
-  (car (window-list endless/minibuffer-frame t))
-  "")
+;; (defvar endless/minibuffer-window
+;;   (car (window-list endless/minibuffer-frame t))
+;;   "")
 
-(defmacro with-popup-minibuffer (&rest body)
-  "Execute BODY using a popup minibuffer."
-  (let ((frame-symbol (make-symbol "selected-frame")))
-    `(let* ((,frame-symbol (selected-frame)))
-       (unwind-protect
-           (progn
-             (make-frame-visible endless/minibuffer-frame)
-             (when (fboundp 'point-screen-height)
-               (set-frame-parameter
-                endless/minibuffer-frame
-                'top (point-screen-height)))
-             (select-frame-set-input-focus endless/minibuffer-frame 'norecord)
-             ,@body)
-         (select-frame-set-input-focus ,frame-symbol)))))
+;; (defmacro with-popup-minibuffer (&rest body)
+;;   "Execute BODY using a popup minibuffer."
+;;   (let ((frame-symbol (make-symbol "selected-frame")))
+;;     `(let* ((,frame-symbol (selected-frame)))
+;;        (unwind-protect
+;;            (progn
+;;              (make-frame-visible endless/minibuffer-frame)
+;;              (when (fboundp 'point-screen-height)
+;;                (set-frame-parameter
+;;                 endless/minibuffer-frame
+;;                 'top (point-screen-height)))
+;;              (select-frame-set-input-focus endless/minibuffer-frame 'norecord)
+;;              ,@body)
+;;          (select-frame-set-input-focus ,frame-symbol)))))
 
-(defun use-popup-minibuffer (function)
-  "Rebind FUNCTION so that it uses a popup minibuffer."
-  (interactive)
-  (let* ((back-symb (intern (format "endless/backup-%s" function)))
-         (func-symb (intern (format "endless/%s-with-popup-minibuffer"
-                                    function)))
-         (defs `(progn
-                  (defvar ,back-symb (symbol-function ',function))
-                  (defun ,func-symb (&rest rest)
-                    ,(format "Call `%s' with a poupup minibuffer." function)
-                    ,@(list (interactive-form function))
-                    (with-popup-minibuffer
-                     (apply ,back-symb rest))))))
-    (message "%s" defs)
-    (when (and (boundp back-symb) (eval back-symb))
-      (error "`%s' already defined! Can't override twice" back-symb))
-    (eval defs)
-    (setf (symbol-function function) func-symb)))
+;; (defun use-popup-minibuffer (function)
+;;   "Rebind FUNCTION so that it uses a popup minibuffer."
+;;   (interactive)
+;;   (let* ((back-symb (intern (format "endless/backup-%s" function)))
+;;          (func-symb (intern (format "endless/%s-with-popup-minibuffer"
+;;                                     function)))
+;;          (defs `(progn
+;;                   (defvar ,back-symb (symbol-function ',function))
+;;                   (defun ,func-symb (&rest rest)
+;;                     ,(format "Call `%s' with a poupup minibuffer." function)
+;;                     ,@(list (interactive-form function))
+;;                     (with-popup-minibuffer
+;;                      (apply ,back-symb rest))))))
+;;     (message "%s" defs)
+;;     (when (and (boundp back-symb) (eval back-symb))
+;;       (error "`%s' already defined! Can't override twice" back-symb))
+;;     (eval defs)
+;;     (setf (symbol-function function) func-symb)))
 
 ;;; Try at own risk.
-(use-popup-minibuffer 'read-from-minibuffer)
+;; (use-popup-minibuffer 'read-from-minibuffer)
 ;;; This will revert the effect.
 ;; (setf (symbol-function #'read-from-minibuffer) endless/backup-read-from-minibuffer)
 ;; (setq endless/backup-read-from-minibuffer nil)
@@ -349,28 +356,12 @@ If file path is not available, open $HOME."
       (select-window test1)
       (eshell)
 
-      (defun point-screen-height ()
-        (* (/ (face-attribute 'default :height) 10) 2
-           (- (line-number-at-pos (point))
-              (line-number-at-pos (window-start)))))
-
       (require 'neotree)
-      ;; (setq neo-global--window test1)
-      ;; (setq neo-mode-line-custom-format nil)
       (setq neo-mode-line-type 'none)
       (setq neo-window-width 30)
-      ;; (setq neo-window-fixed-size nil)
       (neotree-show)
-      ;; (setq neo-global--window test1)
-      ;; (set-window-buffer test1 neo-global--buffer)
-      ;; (set-window-buffer test1 (neo-buffer--create))
       (split-window neo-global--window 20)
-      (neotree-projectile)
-      ;; (setq neo-show-action neotree-open-with-projectile)
-      ;; (setq neo-vc-integration t)
-      ;; (neotree-show)
       (set-window-dedicated-p neo-global--window nil)
-      ;;(split-window-below)
       (print (window-list))
       )
     ))
