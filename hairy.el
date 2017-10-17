@@ -10,33 +10,39 @@
   "Make millisec number"
   (timer-duration (concat (number-to-string num) "millisec")))
 
-(defun configure-package-sources (&optional unstable noimage protocol)
+(defvar package-source-melpa-usestable nil "Use MELPA stable library.")
+(defvar package-source-use-image t "Use package source images.")
+(defvar package-source-protocol "http://" "Use https:// or http://")
+
+(defun configure-package-sources ()
   "Configure package sources.
 
 * [Elpa](https://elpa.gnu.org/) - Default
 * [Melpa](https://melpa.org/)   - Popular
 "
-  (let* ((elpa               '("gnu" .
-                               "http://elpa.gnu.org/packages/"))
-	 (elpa-image         '("gun" .
-                               "http://elpa.emacs-china.org/gnu/"))
-	 (melpa-stable       '("melpa-stable" .
-                               "http://stable.melpa.org/packages/"))
-	 (melpa-stable-image '("melpa-stable" .
-                               "http://elpa.emacs-china.org/melpa-stable/"))
-	 (melpa              '("melpa" .
-                               "http://melpa.org/packages/"))
-	 (melpa-image        '("melpa" .
-                               "http://elpa.emacs-china.org/melpa/"))
-	 (env-noimage  "EMACS_PACKAGE_NOT_USE_IMAGE")
-	 (env-unstable "EMACS_PACKAGE_USE_UNSTABLE")
-	 (is-noimage  (or noimage (getenv env-noimage)))
-	 (is-unstable (or unstable (getenv env-unstable))))
-    (if (not is-noimage)
+  (let* ((elpa               `("gnu" .
+                               ,(concat package-source-protocol
+                                        "elpa.gnu.org/packages/")))
+	 (elpa-image         `("gun" .
+                               ,(concat package-source-protocol
+                                        "elpa.emacs-china.org/gnu/")))
+	 (melpa-stable       `("melpa-stable" .
+                               ,(concat package-source-protocol
+                                        "stable.melpa.org/packages/")))
+	 (melpa-stable-image `("melpa-stable" .
+                               ,(concat package-source-protocol
+                                        "elpa.emacs-china.org/melpa-stable/")))
+	 (melpa              `("melpa" .
+                               ,(concat package-source-protocol
+                                        "melpa.org/packages/")))
+	 (melpa-image        `("melpa" .
+                               ,(concat package-source-protocol
+                                        "elpa.emacs-china.org/melpa/"))))
+    (if package-source-use-image
 	(list elpa
-	      (if is-unstable melpa melpa-stable))
+	      (if package-source-melpa-usestable melpa-stable melpa))
       (list elpa-image
-	    (if is-unstable melpa-image melpa-stable-image)))))
+	    (if package-source-melpa-usestable melpa-stable-image melpa-image)))))
 
 (defun reset-package-source ()
   "Reset package source."
@@ -53,10 +59,20 @@
         (package-install feature))
       (funcall 'require feature filename))))
 
+(defvar emacs-maximize-p nil "Maximized emacs.")
+
+(defun maximize-or-restore-emacs ()
+  "Maximize emacs."
+  (interactive)
+  (let ((w32-cmd (if emacs-maximize-p 61728 61488)))
+    (w32-send-sys-command w32-cmd)
+    (setq emacs-maximize-p (not emacs-maximize-p))))
+
 (defun maximize-emacs ()
   "Maximize emacs."
   (interactive)
-  (w32-send-sys-command 61488))
+  (w32-send-sys-command 61488)
+  (setq emacs-maximize-p t))
 
 (defun maximize-restore-emacs ()
   "Maximize emacs."
@@ -75,12 +91,17 @@
   "Configure"
   (require 'package)
   (reset-package-source)
+  (setq package-check-signature nil)
+  (unless (package-installed-p 'dash)
+    (package-refresh-contents))
   (global-set-key (kbd "C-c C-p l") 'package-list-packages-no-fetch)
   (global-set-key (kbd "C-c C-p r") 'reset-package-source)
   (global-set-key (kbd "C-c C-p i") 'package-install)
+  ;; TODO package upgrade
   ;; TODO fetch-timeout
   )
 
+;;;###autoload
 (deftask initial-package
   "Apply package ocnfigs."
   (configure-package))
@@ -167,13 +188,11 @@
   (setq frame-title-format "emacs@%b")
   (mouse-avoidance-mode 'animate)
   (setq column-number-mode t)
-  (set-background-color "snow")
+  ;; (set-background-color "snow")
+  (set-background-color "FloralWhite")
   (set-face-attribute 'default nil :family "Consolas")
-  (set-face-attribute 'default nil :height 100)
+  (set-face-attribute 'default nil :height 120)
   (set-face-attribute 'default nil :foreground "#2e3137")
-  (set-face-attribute 'fringe nil
-                      :foreground (face-foreground 'default)
-                      :background (face-background 'default))
   (require-or-install 'fill-column-indicator)
   (fci-mode 1)
   (setq fill-column 80)
@@ -230,57 +249,27 @@
   (insert (s-repeat 6 " "))
   (render-nav-item "blog" "SlateBlue" (lambda (_btn) (print 42))))
 
-;;;
-;;
-;; +----+-------+-------+------+
-;; |    |       |       |      |
-;; | w1 |       |       |  w6  |
-;; |    |  w3   |   w4  |      |
-;; |    |       |       +------+
-;; +----+       |       |      |
-;; |    |       |       |      |
-;; | w2 +-------+-------+  w7  |
-;; |    |      w5       |      |
-;; +----+---------------+------+
-;;
-;; w1: explorer
-;; w2:
-;;
-;;;
-(defvar layout-project-window-sidebar nil)
-(defvar layout-project-window-body nil)
-(defvar layout-project-window-project nil)
-(defvar layout-project-window-workspace nil)
-(defvar layout-project-window-explorer nil)
-(defvar layout-project-window-code nil)
-(defvar layout-project-window-code1 nil)
-(defvar layout-project-window-code2 nil)
-(defvar layout-project-window-terminal nil)
-(defvar layout-project-window-scm nil)
-(defvar layout-project-window-other nil)
-
-
-(defun neotree-projectile ()
-  "Open neotree with projectile as root and open node for current file.
-If projectile unavailable or not in a project, open node at file path.
-If file path is not available, open $HOME."
-  (interactive)
-  (if (neo-global--window-exists-p)
-      (call-interactively 'neotree-hide)
-    (let ((file-name (buffer-file-name)))
-      (if (and (not file-name)
-               (let ((buffer-name (buffer-name)))
-                 (cond
-                  ((equal buffer-name "*cider-repl server*") nil)
-                  (t t))))
-          (neotree-dir "~/")
-        (let ((dir-name (if (and (fboundp 'projectile-project-p)
-                                 (projectile-project-p))
-                            (projectile-project-root)
-                          (file-name-directory file-name))))
-          (neotree-dir dir-name)
-          (when file-name
-            (neo-buffer--select-file-node file-name)))))))
+;; (defun neotree-projectile ()
+;;   "Open neotree with projectile as root and open node for current file.
+;; If projectile unavailable or not in a project, open node at file path.
+;; If file path is not available, open $HOME."
+;;   (interactive)
+;;   (if (neo-global--window-exists-p)
+;;       (call-interactively 'neotree-hide)
+;;     (let ((file-name (buffer-file-name)))
+;;       (if (and (not file-name)
+;;                (let ((buffer-name (buffer-name)))
+;;                  (cond
+;;                   ((equal buffer-name "*cider-repl server*") nil)
+;;                   (t t))))
+;;           (neotree-dir "~/")
+;;         (let ((dir-name (if (and (fboundp 'projectile-project-p)
+;;                                  (projectile-project-p))
+;;                             (projectile-project-root)
+;;                           (file-name-directory file-name))))
+;;           (neotree-dir dir-name)
+;;           (when file-name
+;;             (neo-buffer--select-file-node file-name)))))))
 
 
 ;; (defvar endless/popup-frame-parameters
@@ -340,6 +329,107 @@ If file path is not available, open $HOME."
 ;; (setf (symbol-function #'read-from-minibuffer) endless/backup-read-from-minibuffer)
 ;; (setq endless/backup-read-from-minibuffer nil)
 
+;;;
+;;
+;; +----+-------+-------+------+
+;; |    |       |       |      |
+;; | w1 |       |       |  w6  |
+;; |    |  w3   |   w4  |      |
+;; |    |       |       +------+
+;; +----+       |       |      |
+;; |    |       |       |      |
+;; | w2 +-------+-------+  w7  |
+;; |    |      w5       |      |
+;; +----+---------------+------+
+;;
+;; w1: explorer
+;; w2:
+;;
+;;;
+(defvar layout-project-window-sidebar nil)
+(defvar layout-project-window-body nil)
+(defvar layout-project-window-project nil)
+(defvar layout-project-window-workspace nil)
+(defvar layout-project-window-explorer nil)
+(defvar layout-project-window-code nil)
+(defvar layout-project-window-code1 nil)
+(defvar layout-project-window-code2 nil)
+(defvar layout-project-window-terminal nil)
+(defvar layout-project-window-scm nil)
+(defvar layout-project-window-other nil)
+
+(defface project-explorer-default-face
+  '((t (:background "#F7F2E9" :height 100)))
+  "Project layout explorer default face."
+  :group 'layout-project)
+
+;; (require 'json)
+(defun workspace-findall ()
+  ""
+  (require-or-install 'projectile)
+  (let* ((projects (projectile-load-known-projects)))
+    (-map (lambda (project-root)
+            (let* ((project-type (gethash project-root
+                                          projectile-project-type-cache))
+                   (marker-file (plist-get (gethash project-type
+                                                    projectile-project-types)
+                                           'marker-files))
+                   (version (if (and marker-file
+                                     (string= (f-ext (car marker-file)) "json"))
+                                (let* ((marker-file-path (concat project-root
+                                                                 (car marker-file))))
+                                  (alist-get 'version
+                                             (json-read-file marker-file-path)))
+                              nil)))
+              `(:name ,(f-filename project-root)
+                      :path ,(f-dirname project-root)
+                      :vc ,(projectile-project-vcs project-root)
+                      :type ,project-type
+                      :version ,version
+                      )))
+          projects)))
+
+;; (workspace-findall)
+
+(defun configure-neotree ()
+  "Configure neotree expolorer."
+  (require-or-install 'neotree)
+  (setq neo-create-file-auto-open nil
+        neo-auto-indent-point nil
+        neo-autorefresh nil
+        neo-mode-line-type 'none
+        neo-window-width 35
+        neo-show-updir-line nil
+        ;; neo-theme 'nerd ; fallback
+        neo-theme 'icons
+        neo-banner-message nil
+        neo-confirm-create-file #'off-p
+        neo-confirm-create-directory #'off-p
+        neo-show-hidden-files nil
+        neo-keymap-style 'concise
+        neo-hidden-regexp-list
+        '(;; vcs folders
+          "^\\.\\(git\\|hg\\|svn\\)$"
+          ;; compiled files
+          "\\.\\(pyc\\|o\\|elc\\|lock\\|css.map\\)$"
+          ;; generated files, caches or local pkgs
+          "^\\(node_modules\\|vendor\\|.\\(project\\|cask\\|yardoc\\|sass-cache\\)\\)$"
+          ;; org-mode folders
+          "^\\.\\(sync\\|export\\|attach\\)$"
+          "~$"
+          "^#.*#$"))
+
+  (add-hook 'neo-after-create-hook
+            (lambda (_window)
+              (set-window-fringes neo-global--window 0 0)
+              (setq buffer-face-mode-face 'project-explorer-default-face)
+              (buffer-face-mode)
+              (set-face-foreground 'vertical-border "#F7F2E9")
+              (set-face-background 'fringe "#F7F2E9")
+              ))
+  (neotree)
+  )
+
 (defun layout-project ()
   "Render default project layout, when press 'project' link."
   (interactive)
@@ -347,21 +437,20 @@ If file path is not available, open $HOME."
          (window (selected-window))
          (window-width (window-body-width))
          (window-height (window-body-height)))
-    (maximize-emacs)
+    (maximize-or-restore-emacs)
     (save-current-buffer
       (generate-new-buffer buf-name)
       (switch-to-buffer (get-buffer-create buf-name))
       (setq test1 (split-window window 30))
-      (require 'eshell)
+      ;; (require 'eshell)
+      (require-or-install 'projectile)
       (select-window test1)
-      (eshell)
-
-      (require 'neotree)
-      (setq neo-mode-line-type 'none)
-      (setq neo-window-width 30)
-      (neotree-show)
-      (split-window neo-global--window 20)
-      (set-window-dedicated-p neo-global--window nil)
+      ;; (eshell)
+      ;; (projectile-run-eshell)
+      (configure-neotree)
+      (buffer-face-mode)
+      ;; (split-window neo-global--window 20)
+      ;; (set-window-dedicated-p neo-global--window nil)
       (print (window-list))
       )
     ))
@@ -571,13 +660,12 @@ If file path is not available, open $HOME."
 
 (defun configure-icons ()
   "Configure icon font"
-  ;; (require-or-install 'all-the-icons)
-  ;; (all-the-icons-install-fonts)
-  )
+  (require-or-install 'all-the-icons)
+  (setq inhibit-compacting-font-caches t))
 
 (defun configure-perspective ()
   "Configure perspective."
-  ()
+  ;;()
   )
 
 (defun configure-eshell ()
@@ -607,10 +695,13 @@ If file path is not available, open $HOME."
   (require-or-install 'projectile)
   (require-or-install 'neotree)
   (require-or-install 'ag)
-  (configure-repl))
+  (configure-repl)
+  ;; (setq projectile-cache-file t)
+  )
 
 (deftask project
   "Apply project configs."
+  ;; (setq SHELL "/bin/bash emacs")
   (run-with-timer (ms 100) nil 'configure-project))
 
 
