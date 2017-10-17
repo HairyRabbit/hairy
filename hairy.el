@@ -38,7 +38,7 @@
 	 (melpa-image        `("melpa" .
                                ,(concat package-source-protocol
                                         "elpa.emacs-china.org/melpa/"))))
-    (if package-source-use-image
+    (if (not package-source-use-image)
 	(list elpa
 	      (if package-source-melpa-usestable melpa-stable melpa))
       (list elpa-image
@@ -50,13 +50,12 @@
   (setq package-archives (configure-package-sources))
   (package-initialize))
 
-(defun require-or-install (feature &optional filename unstable)
+(defun require-or-install (feature &optional filename source)
   "Install package when require failed."
   (unless (funcall 'require feature filename t)
     (progn
-      (if unstable
-          (package-install-from-archive feature)
-        (package-install feature))
+      ;; TODO install from source supports.
+      (package-install feature)
       (funcall 'require feature filename))))
 
 (defvar emacs-maximize-p nil "Maximized emacs.")
@@ -77,7 +76,8 @@
 (defun maximize-restore-emacs ()
   "Maximize emacs."
   (interactive)
-  (w32-send-sys-command 61728))
+  (w32-send-sys-command 61728)
+  (setq emacs-maximize-p nil))
 
 (defun set-font-color (str color)
   "Set font color."
@@ -85,30 +85,35 @@
 
 
 
-;;;; Package
+;;;; Package manager
+
+;; TODO check package upgrade
+;; TODO fetch timeout
 
 (defun configure-package ()
-  "Configure"
+  "Configure package."
   (require 'package)
   (reset-package-source)
   (setq package-check-signature nil)
-  (unless (package-installed-p 'dash)
-    (package-refresh-contents))
+  (unless (or (package-installed-p 'dash)
+              (package-installed-p 'projectile))
+    (package-refresh-contents)))
+
+(defun binding-package-keymaps ()
+  "Bind package keymaps."
   (global-set-key (kbd "C-c C-p l") 'package-list-packages-no-fetch)
   (global-set-key (kbd "C-c C-p r") 'reset-package-source)
-  (global-set-key (kbd "C-c C-p i") 'package-install)
-  ;; TODO package upgrade
-  ;; TODO fetch-timeout
-  )
+  (global-set-key (kbd "C-c C-p i") 'package-install))
 
 ;;;###autoload
 (deftask initial-package
   "Apply package ocnfigs."
-  (configure-package))
+  (configure-package)
+  (binding-package-keymaps))
 
 
 
-;;;; Preload
+;;;; Preload library.
 
 (defun configure-dash ()
   "Configure dash-2.12.0"
@@ -668,16 +673,46 @@
   ;;()
   )
 
+(defun create-eshell-alias (&rest args)
+  "Define eshell alias."
+  (let ((name (car args)))
+    (unless (eshell-command-aliased-p name)
+      (apply 'eshell/alias args))))
+
 (defun configure-eshell ()
   (require 'eshell)
+  (require-or-install 'eshell-fixed-prompt)
+  (require-or-install 'eshell-prompt-extras)
+  (setq eshell-highlight-prompt nil
+        eshell-prompt-function 'epe-theme-lambda)
 
+  (require 'em-alias)
+  ;; commons
+  (create-eshell-alias "l" "ls")
+  (create-eshell-alias "la" "ls -lAFh")
+  (create-eshell-alias "lr" "ls -tRFh")
+  (create-eshell-alias "lt" "ls -ltFh")
+  (create-eshell-alias "ll" "ls -l")
+  (create-eshell-alias "ldot" "ls -ld .*")
+  (create-eshell-alias "lart" "ls -1FSsh")
+  (create-eshell-alias "lart" "ls -1Fcart")
+  (create-eshell-alias "lrt" "ls -1Fcrt")
+  ;; git
+  (create-eshell-alias "g" "git")
+  (create-eshell-alias "ga" "git add")
+  (create-eshell-alias "gaa" "git add --all")
+  (create-eshell-alias "gau" "git add --update")
+  (create-eshell-alias "gb" "git branch")
+  (create-eshell-alias "gba" "git branch -a")
+  (create-eshell-alias "gbd" "git branch -d")
+  (create-eshell-alias "gbda" "git branch --no-color --merged | command grep -vE \"^(\*|\s*(master|develop|dev)\s*$)\" | command xargs -n 1 git branch -d")
   )
 
 (defun repl-open ()
   "Open REPL buffer"
   (interactive)
   (let ((buf-name "*REPL*"))
-
+    (eshell)
     ))
 
 (defun configure-repl ()
@@ -690,8 +725,9 @@
 
 (defun configure-project ()
   ""
-  (configure-perspective)
-  (configure-icons)
+  ;; (configure-perspective)
+  ;; (configure-icons)
+  (configure-eshell)
   (require-or-install 'projectile)
   (require-or-install 'neotree)
   (require-or-install 'ag)
