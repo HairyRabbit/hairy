@@ -50,7 +50,7 @@
   (setq package-archives (configure-package-sources))
   (package-initialize))
 
-(defun require-or-install (feature &optional filename source)
+(defun require-or-install (feature &optional filename)
   "Install package when require failed."
   (unless (funcall 'require feature filename t)
     (progn
@@ -351,6 +351,7 @@
 ;; w2:
 ;;
 ;;;
+(defvar layout-emacs-window nil)
 (defvar layout-project-window-sidebar nil)
 (defvar layout-project-window-body nil)
 (defvar layout-project-window-project nil)
@@ -370,7 +371,7 @@
 
 ;; (require 'json)
 (defun workspace-findall ()
-  ""
+  "Find all projects."
   (require-or-install 'projectile)
   (let* ((projects (projectile-load-known-projects)))
     (-map (lambda (project-root)
@@ -394,7 +395,23 @@
                       )))
           projects)))
 
+(defun workspace-render ()
+  "Render projects infomation."
+  (let* ((projects (workspace-findall))
+
+         )
+    ))
+
 ;; (workspace-findall)
+(defun neo-display-fn (buffer _alist)
+  "Display BUFFER to the left or right of the root window.
+The side is decided according to `neo-window-position'.
+The root window is the root window of the selected frame.
+_ALIST is ignored."
+  (let ((window-pos (if (eq neo-window-position 'left) 'left 'right)))
+    ;; (display-buffer-in-side-window buffer `((side . ,window-pos)))
+    (display-buffer-pop-up-window buffer '())
+    ))
 
 (defun configure-neotree ()
   "Configure neotree expolorer."
@@ -405,8 +422,9 @@
         neo-mode-line-type 'none
         neo-window-width 35
         neo-show-updir-line nil
-        ;; neo-theme 'nerd ; fallback
-        neo-theme 'icons
+        neo-theme 'nerd ; fallback
+        ;; neo-theme 'icons
+        ;; neo-display-action 'neo-display-fn
         neo-banner-message nil
         neo-confirm-create-file #'off-p
         neo-confirm-create-directory #'off-p
@@ -470,42 +488,70 @@
 ;;          (with-current-buffer buf
 ;;            (ansi-color-apply-on-region (point-min) (point-max))))))
 
-(define-derived-mode hairy-mode
-  fundamental-mode "Hairy"
-  "Hairy Rabbit emacs greeting."
-  (read-only-mode 1)
-  (setq mode-line-format nil)
-  (font-lock-mode nil)
-  (define-key hairy-mode-map (kbd "p") 'layout-project))
+(defvar hairy-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "p") 'layout-project)
+    (global-set-key (kbd "C-c C-q") 'switch-to-hairy)
+    map)
+  "hairy-mode keymaps.")
 
-(defun configure-greeting ()
-  "Render startup screen."
-  (setq inhibit-startup-screen t)
-  (let ((hairy-buffer-name "*Hairy*")
-        (window (selected-window))
-        (window-width (window-body-width))
+(define-derived-mode hairy-mode special-mode "Hairy"
+  "Hairy Rabbit emacs greeting."
+  (setq mode-line-format nil
+        buffer-read-only t
+        indent-tabs-mode nil
+        font-lock-mode nil))
+
+(defvar hairy-buffer-name "*Hairy*" "Hairy buffer name")
+
+(defun hairy/render-header (max-width max-height)
+  "Render hairy header."
+  (newline (- (/ max-height 2) 1))
+  (insert (s-center max-width (render-banner)))
+  (newline)
+  (insert (s-center max-width (render-hr)))
+  (newline)
+  (insert (s-center max-width (render-small))))
+
+(defun create-hairy-buffer (window)
+  "Create *Hairy* buffer."
+  (let ((window-width (window-body-width))
         (window-height (window-body-height))
         (body-point 0))
-    (save-current-buffer
-      (when (get-buffer hairy-buffer-name)
-        (kill-buffer hairy-buffer-name))
-      (generate-new-buffer hairy-buffer-name)
-      (set-buffer (get-buffer-create hairy-buffer-name))
-      (newline (- (/ window-height 2) 1))
-      (insert (s-center window-width (render-banner)))
-      (newline)
-      (insert (s-center window-width (render-hr)))
-      (newline)
-      (insert (s-center window-width (render-small)))
+    (with-current-buffer (get-buffer-create hairy-buffer-name)
+      (read-only-mode 0)
+      (erase-buffer)
+      (hairy/render-header window-width
+                           window-height)
       (newline 4)
       (insert (s-repeat (/ (- window-width 36) 2) " "))
       (render-nav)
       (newline)
-      ;; TODO Add package upgrade info.
-      ;; (setq body-point (point))
-      ;; (delete-region body-point (buffer-end 1))
-      (hairy-mode))
-    (setq initial-buffer-choice (lambda () (get-buffer "*Hairy*")))))
+      (hairy-mode))))
+
+(defun switch-to-hairy ()
+  "Switch to Hairy."
+  (interactive)
+  (maximize-restore-emacs)
+  (neotree-hide)
+  (if (window-live-p layout-emacs-window)
+      (delete-other-windows layout-emacs-window)
+    (progn
+      (delete-other-windows)
+      (setq layout-emacs-window (selected-window))))
+  (when (not (get-buffer hairy-buffer-name))
+    (create-hairy-buffer layout-emacs-window))
+  (set-window-vscroll layout-emacs-window 0)
+  (set-window-hscroll layout-emacs-window 0)
+  (set-window-buffer layout-emacs-window hairy-buffer-name))
+
+(defun configure-greeting ()
+  "Render startup screen."
+  (setq layout-emacs-window (frame-first-window))
+  (create-hairy-buffer layout-emacs-window)
+  (add-hook 'window-size-change-functions 'create-hairy-buffer)
+  (setq inhibit-startup-screen t)
+  (setq initial-buffer-choice (lambda () (get-buffer hairy-buffer-name))))
 
 (defun configure-restart-emacs ()
   "Restart emacs"
