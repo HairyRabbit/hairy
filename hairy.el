@@ -1,10 +1,24 @@
 ;;; hairy.el --- Hairy Rabbit  -*- lexical-binding: t -*-
 
-;;; Utils
-
+;;;; tasks
+(defvar hairy/app-start-timestamp (current-time)
+  "")
+(defvar hairy/task-list '()
+  "")
 (defmacro deftask (name &optional docs &rest body)
   "Run tasks."
-  `(progn ,@body))
+  (let ((start-time (current-time))
+        (task-name (symbol-name name)))
+    `(progn ,@body
+            (let ((during-time (float-time (time-subtract (current-time)
+                                                          ',start-time))))
+              (add-to-list 'hairy/task-list
+                           '(:name ,task-name :cost during-time))
+              (message "Task %s const %.3fs" ,task-name during-time)))))
+
+(defmacro deftask-delay (name &optional docs &rest body)
+  "Run tasks."
+  `(run-with-timer "100millisec" nil (lambda () (progn ,@body))))
 
 (defun ms (num)
   "Make millisec number"
@@ -58,14 +72,17 @@
       (package-install feature)
       (funcall 'require feature filename))))
 
-(defvar emacs-maximize-p nil "Maximized emacs.")
+
+;;;; Commmands
+(defvar emacs-maximize-p nil
+  "Maximized emacs.")
 
 (defun maximize-or-restore-emacs ()
   "Maximize emacs."
   (interactive)
-  (let ((w32-cmd (if emacs-maximize-p 61728 61488)))
-    (w32-send-sys-command w32-cmd)
-    (setq emacs-maximize-p (not emacs-maximize-p))))
+  (if (not emacs-maximize-p)
+      (maximize-emacs)
+    (maximize-restore-emacs)))
 
 (defun maximize-emacs ()
   "Maximize emacs."
@@ -84,37 +101,23 @@
   (propertize str 'face `((:foreground ,color))))
 
 
-
 ;;;; Package manager
-
 ;; TODO check package upgrade
 ;; TODO fetch timeout
-
-(defun configure-package ()
-  "Configure package."
-  (require 'package)
+(deftask hairy/configure-package
+  "Apply package configs."
+  (require-or-install 'package)
   (reset-package-source)
   (setq package-check-signature nil)
   (unless (or (package-installed-p 'dash)
               (package-installed-p 'projectile))
-    (package-refresh-contents)))
-
-(defun binding-package-keymaps ()
-  "Bind package keymaps."
+    (package-refresh-contents))
   (global-set-key (kbd "C-c C-p l") 'package-list-packages-no-fetch)
   (global-set-key (kbd "C-c C-p r") 'reset-package-source)
   (global-set-key (kbd "C-c C-p i") 'package-install))
 
-;;;###autoload
-(deftask initial-package
-  "Apply package ocnfigs."
-  (configure-package)
-  (binding-package-keymaps))
-
 
-
 ;;;; Preload library.
-
 (defun configure-dash ()
   "Configure dash-2.12.0"
   (require-or-install 'dash)
@@ -127,6 +130,219 @@
   (require-or-install 'f))
 
 
+
+;;;; Hairy workspace
+
+(defvar hairy-dashboard-buffer-name "*Hairy*"
+  "Hairy dashboard buffer name.")
+
+(defvar hairy-dashboard-hr-length 10
+  "Hairy dashboard hr length.")
+
+(defvar hairy-dashboard-small-text "echo"
+  "Hairy dashboard small text.")
+
+(defface hairy-dashboard-symbol-face
+  '((t (:foreground "LightGray")))
+  "Hairy logo text '[' and ']' color.")
+
+(defface hairy-dashboard-text-H-face
+  '((t (:foreground "SlateBlue")))
+  "Hairy logo text 'H' color.")
+
+(defface hairy-dashboard-text-A-face
+  '((t (:foreground "DeepSkyBlue")))
+  "Hairy logo text 'A' color.")
+
+(defface hairy-dashboard-text-I-face
+  '((t (:foreground "DodgerBlue")))
+  "Hairy logo text 'I' color.")
+
+(defface hairy-dashboard-text-Y-face
+  '((t (:foreground "plum")))
+  "Hairy logo text 'Y' color.")
+
+(defface hairy-dashboard-text-R-face
+  '((t (:foreground "purple")))
+  "Hairy logo text 'R' color.")
+
+(defface hairy-dashboard-text-B-face
+  '((t (:foreground "salmon")))
+  "Hairy logo text 'B' color.")
+
+(defface hairy-dashboard-small-text-face
+  '((t (:foreground "DodgerBlue")))
+  "Hairy small text color.")
+
+(defface hairy-dashboard-action-face-1
+  '((t (:foreground "purple")))
+  "Hairy small action text color 1.")
+
+(defface hairy-dashboard-action-face-2
+  '((t (:foreground "plum")))
+  "Hairy small action text color 2.")
+
+(defface hairy-dashboard-action-face-3
+  '((t (:foreground "SlateBlue")))
+  "Hairy small action text color 3.")
+
+(defface hairy-dashboard-action-face-4
+  '((t (:foreground "DodgerBlue")))
+  "Hairy small action text color 4.")
+
+(defface hairy-dashboard-action-face-5
+  '((t (:foreground "DodgerBlue")))
+  "Hairy small action text color 5.")
+
+(defface hairy-dashboard-action-face-6
+  '((t (:foreground "DodgerBlue")))
+  "Hairy small action text color 6.")
+
+;;; Todos
+(defvar hairy-dashboard-action-todos
+  (list :text "todos"
+        :face 'hairy-dashboard-action-face-1
+        :handle 'hairy/start-todos)
+  "Open todos layout.")
+
+(defun hairy/start-todos ()
+  "Open todos layout."
+  42)
+
+;;; Projects
+(defvar hairy-dashboard-action-projects
+  (list :text "projects"
+        :face 'hairy-dashboard-action-face-2
+        :handle 'hairy/start-projects)
+  "Open projects layout.")
+
+(defun hairy/start-projects ()
+  "Open projects layout."
+  42)
+
+(defvar hairy-dashboard-action-blog
+  (list :text "blog"
+        :face 'hairy-dashboard-action-face-3
+        :handle 'hairy/start-blog)
+  "Open blog layout.")
+
+(defun hairy/start-blog ()
+  "Open blog layout."
+  42)
+
+(defun set-font-color (str color)
+  "Set font color."
+  (propertize str 'face `((:foreground ,color))))
+
+;;; Render header.
+(defun hairy-dashboard/make-banner ()
+  "Make hairy dashboard banner text."
+  (let ((char-\[ (propertize "[" 'face 'hairy-dashboard-symbol-face))
+        (char-\] (propertize "]" 'face 'hairy-dashboard-symbol-face))
+        (char-\H (propertize "H" 'face 'hairy-dashboard-text-H-face))
+        (char-\A (propertize "A" 'face 'hairy-dashboard-text-A-face))
+        (char-\I (propertize "I" 'face 'hairy-dashboard-text-I-face))
+        (char-\Y (propertize "Y" 'face 'hairy-dashboard-text-Y-face))
+        (char-\R (propertize "R" 'face 'hairy-dashboard-text-R-face))
+        (char-\B (propertize "B" 'face 'hairy-dashboard-text-B-face)))
+    (s-join "  " (list char-\[ char-\H char-\A "I" "R" char-\Y char-\]
+                       " "
+                       char-\R "A" "B" char-\B char-\I "T" ))))
+
+(defun hairy-dashboard/make-hr ()
+  "Make hairy split-line text below the banner."
+  (s-pad-left 39 " "
+              (propertize (s-repeat hairy-dashboard-hr-length "_")
+                          'face 'hairy-dashboard-symbol-face)))
+
+(defun hairy-dashboard/make-small-text ()
+  "Make hairy small text."
+  (s-pad-left 40 " "
+              (propertize hairy-dashboard-small-text
+                          'face 'hairy-dashboard-small-text-face)))
+
+(defun hairy-dashboard/render-header (max-width max-height)
+  "Render hairy header."
+  (let ((banner (hairy-dashboard/make-banner))
+        (hr     (hairy-dashboard/make-hr))
+        (small  (hairy-dashboard/make-small-text)))
+    (newline (- (/ max-height 2) 2))
+    (insert (s-center max-width banner))
+    (newline)
+    (insert (s-center max-width hr))
+    (newline)
+    (insert (s-center max-width small))))
+
+(defun hairy-dashboard/render-action (action)
+  "Render Navigator item."
+  (let* ((str    (plist-get action :text))
+         (face   (plist-get action :face))
+         (handle (plist-get action :handle))
+         (arr    (s-split "" str t))
+         (fst    (s-wrap (car arr) "[" "]"))
+         (tails  (s-join "" (cdr arr))))
+    (insert-text-button (propertize fst 'face face)
+                        'action handle)
+    (insert tails)))
+
+(defun hairy-dashboard/render-nav ()
+  "Render navigator."
+  (hairy-dashboard/render-action hairy-dashboard-action-todos)
+  (insert (s-repeat 6 " "))
+  (hairy-dashboard/render-action hairy-dashboard-action-projects)
+  (insert (s-repeat 6 " "))
+  (hairy-dashboard/render-action hairy-dashboard-action-blog))
+
+(defun hairy-dashboard/create-buffer (window)
+  "Create *Hairy* buffer."
+  (let ((w (window-body-width))
+        (h (window-body-height)))
+    (with-current-buffer (get-buffer-create hairy-dashboard-buffer-name)
+      (read-only-mode 0)
+      (erase-buffer)
+      (hairy-dashboard/render-header w h)
+      (newline 4)
+      (insert (s-repeat (/ (- w 36) 2) " "))
+      (hairy-dashboard/render-nav)
+      (newline)
+      (hairy-mode))))
+
+(defun switch-to-hairy ()
+  "Switch to Hairy."
+  (interactive)
+  (maximize-restore-emacs)
+  (neotree-hide)
+  (if (window-live-p layout-emacs-window)
+      (delete-other-windows layout-emacs-window)
+    (progn
+      (delete-other-windows)
+      (setq layout-emacs-window (selected-window))))
+  (when (not (get-buffer hairy-dashboard-buffer-name))
+    (hairy-dashboard/create-buffer layout-emacs-window))
+  (set-window-vscroll layout-emacs-window 0)
+  (set-window-hscroll layout-emacs-window 0)
+  (set-window-buffer layout-emacs-window hairy-dashboard-buffer-name))
+
+(defvar hairy-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "p") 'layout-project)
+    (global-set-key (kbd "C-c C-q") 'switch-to-hairy)
+    map)
+  "hairy-mode keymaps.")
+
+(define-derived-mode hairy-mode special-mode "Hairy"
+  "Hairy Rabbit emacs greeting."
+  (setq mode-line-format nil
+        buffer-read-only t
+        indent-tabs-mode nil
+        font-lock-mode nil))
+
+(deftask hairy/greeting
+  "Reset startup screen."
+  (hairy-dashboard/create-buffer (selected-window))
+  (add-hook 'window-size-change-functions 'hairy-dashboard/create-buffer)
+  (setq inhibit-startup-screen t)
+  (setq initial-buffer-choice (lambda () (get-buffer hairy-buffer-name))))
 
 ;;;; Editor
 
@@ -185,7 +401,7 @@
   (menu-bar-mode -1)
   (scroll-bar-mode -1)
   (tooltip-mode -1)
-  (set-frame-width (selected-frame) 86)
+  (set-frame-width (selected-frame) 90)
   (set-frame-height (selected-frame) 33))
 
 (defun configure-ui ()
@@ -193,11 +409,14 @@
   (setq frame-title-format "emacs@%b")
   (mouse-avoidance-mode 'animate)
   (setq column-number-mode t)
-  ;; (set-background-color "snow")
-  (set-background-color "FloralWhite")
-  (set-face-attribute 'default nil :family "Consolas")
-  (set-face-attribute 'default nil :height 120)
-  (set-face-attribute 'default nil :foreground "#2e3137")
+  (set-face-attribute 'default nil
+                      :family "Consolas"
+                      :height 110
+                      :foreground "#372620"
+                      :background "FloralWhite")
+  (set-face-attribute 'fringe nil
+                      :foreground (face-foreground 'default)
+                      :background (face-background 'default))
   (require-or-install 'fill-column-indicator)
   (fci-mode 1)
   (setq fill-column 80)
@@ -504,6 +723,7 @@ _ALIST is ignored."
 
 (defvar hairy-buffer-name "*Hairy*" "Hairy buffer name")
 
+;; TODO use small-view when window-max-width too small.
 (defun hairy/render-header (max-width max-height)
   "Render hairy header."
   (newline (- (/ max-height 2) 1))
@@ -521,37 +741,14 @@ _ALIST is ignored."
     (with-current-buffer (get-buffer-create hairy-buffer-name)
       (read-only-mode 0)
       (erase-buffer)
-      (hairy/render-header window-width
-                           window-height)
+      (hairy/render-header window-width window-height)
       (newline 4)
       (insert (s-repeat (/ (- window-width 36) 2) " "))
       (render-nav)
       (newline)
       (hairy-mode))))
 
-(defun switch-to-hairy ()
-  "Switch to Hairy."
-  (interactive)
-  (maximize-restore-emacs)
-  (neotree-hide)
-  (if (window-live-p layout-emacs-window)
-      (delete-other-windows layout-emacs-window)
-    (progn
-      (delete-other-windows)
-      (setq layout-emacs-window (selected-window))))
-  (when (not (get-buffer hairy-buffer-name))
-    (create-hairy-buffer layout-emacs-window))
-  (set-window-vscroll layout-emacs-window 0)
-  (set-window-hscroll layout-emacs-window 0)
-  (set-window-buffer layout-emacs-window hairy-buffer-name))
 
-(defun configure-greeting ()
-  "Render startup screen."
-  (setq layout-emacs-window (frame-first-window))
-  (create-hairy-buffer layout-emacs-window)
-  (add-hook 'window-size-change-functions 'create-hairy-buffer)
-  (setq inhibit-startup-screen t)
-  (setq initial-buffer-choice (lambda () (get-buffer hairy-buffer-name))))
 
 (defun configure-restart-emacs ()
   "Restart emacs"
@@ -569,8 +766,8 @@ _ALIST is ignored."
   (configure-conding-system)
   (configure-frame-default)
   (configure-ui)
-  (configure-greeting)
-  (configure-restart-emacs)
+  ;; (hairy/configure-greeting)
+  ;; (configure-restart-emacs)
   (setq visible-bell t))
 
 (defun configure-emms ()
