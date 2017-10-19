@@ -1,8 +1,27 @@
 ;;; hairy.el --- Hairy Rabbit  -*- lexical-binding: t -*-
 
-;;;; tasks
-(defvar hairy/app-start-timestamp (current-time)
-  "")
+;; Copyright (C) 2017 by Rabbit
+
+;; Author: Rabbit
+;; URL: https://github.com/yuffiy/hairy
+;; Package-Version: 0.0.1
+;; Version: 0.0.1
+;; Keywords: Hairy
+;; Package-Requires: ((emacs "25.3"))
+
+;;; Code:
+
+;;;; Application
+(defvar hairy/app-name "Hairy"
+  "App name.")
+
+(defvar hairy/app-version "0.0.0"
+  "App version.")
+
+(defvar hairy/app-init-time (current-time)
+  "App start time.")
+
+;;;; Tasks
 (defvar hairy/task-list '()
   "")
 (defmacro deftask (name &optional docs &rest body)
@@ -1311,3 +1330,5 @@ _ALIST is ignored."
 ;; + yaml-mode (ELPA)
 ;; + yard-mode (ELPA)
 ;; + yasnippet (ELPA)
+
+;;; hairy.el ends here
