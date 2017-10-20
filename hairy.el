@@ -552,6 +552,12 @@
   ;; (setq coding-system-for-write 'utf-8)
   ;; (setq-default buffer-file-coding-system 'utf-8-unix)
   ;; (setq-default file-name-coding-system 'utf-8-unix)
+  ;; (require-or-install 'cnfonts)
+  ;; (cnfonts-enable)
+  (require-or-install 'unicode-fonts)
+  (unicode-fonts-setup)
+  (set-fontset-font "fontset-default" nil
+                    (font-spec :size 20 :name "Symbola"))
   )
 
 (defun configure-frame-default ()
@@ -570,7 +576,6 @@
   (setq column-number-mode t)
   (set-face-attribute 'default nil
                       :family "Consolas"
-                      :height 110
                       :foreground "#372620"
                       :background "FloralWhite")
   (set-face-attribute 'fringe nil
