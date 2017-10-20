@@ -4,7 +4,6 @@
 
 ;; Author: Rabbit
 ;; URL: https://github.com/yuffiy/hairy
-;; Package-Version: 0.0.1
 ;; Version: 0.0.1
 ;; Keywords: Hairy
 ;; Package-Requires: ((emacs "25.3"))
@@ -12,40 +11,59 @@
 ;;; Code:
 
 ;;;; Application
-(defvar hairy/app-name "Hairy"
+(defconst hairy/app-name "Hairy"
   "App name.")
 
-(defvar hairy/app-version "0.0.0"
+(defconst hairy/app-version "0.0.0"
   "App version.")
 
-(defvar hairy/app-init-time (current-time)
+(defconst hairy/app-init-time (current-time)
   "App start time.")
 
 ;;;; Tasks
 (defvar hairy/task-list '()
-  "")
+  "Task list.")
+
+(defun hairy/during (start-time)
+  "Compute during between start-time and current-time."
+  (float-time (time-subtract (current-time) start-time)))
+
 (defmacro deftask (name &optional docs &rest body)
   "Run tasks."
   (let ((start-time (current-time))
         (task-name (symbol-name name)))
     `(progn ,@body
-            (let ((during-time (float-time (time-subtract (current-time)
-                                                          ',start-time))))
+            (let ((during (hairy/during ',start-time)))
               (add-to-list 'hairy/task-list
-                           '(:name ,task-name :cost during-time))
-              (message "Task %s const %.3fs" ,task-name during-time)))))
+                           '(:name ,task-name :cost during))
+              (message "Task %s const %.3fs" ,task-name during)))))
 
 (defmacro deftask-delay (name &optional docs &rest body)
-  "Run tasks."
-  `(run-with-timer "100millisec" nil (lambda () (progn ,@body))))
+  "Run tasks in timer, delay 100ms."
+  (let ((start-time (current-time))
+        (task-name (symbol-name name)))
+    `(run-with-timer
+      "100millisec" nil
+      (lambda ()
+        (progn ,@body
+               (let ((during (hairy/during ',start-time)))
+                 (add-to-list 'hairy/task-list
+                              '(:name ,task-name :cost during))
+                 (message "Task %s const %.3fs" ,task-name during)))))))
 
 (defun ms (num)
   "Make millisec number"
   (timer-duration (concat (number-to-string num) "millisec")))
 
-(defvar package-source-melpa-usestable nil "Use MELPA stable library.")
-(defvar package-source-use-image t "Use package source images.")
-(defvar package-source-protocol "http://" "Use https:// or http://")
+;;;; Packages
+(defvar package-source-melpa-usestable nil
+  "Use MELPA stable library.")
+
+(defvar package-source-use-image t
+  "Use package source images.")
+
+(defvar package-source-protocol "http://"
+  "Use https:// or http://")
 
 (defun configure-package-sources ()
   "Configure package sources.
@@ -87,10 +105,8 @@
   "Install package when require failed."
   (unless (funcall 'require feature filename t)
     (progn
-      ;; TODO install from source supports.
-      (package-install feature)
+      (package-install feature nil)
       (funcall 'require feature filename))))
-
 
 ;;;; Commmands
 (defvar emacs-maximize-p nil
@@ -125,7 +141,7 @@
 ;; TODO fetch timeout
 (deftask hairy/configure-package
   "Apply package configs."
-  (require-or-install 'package)
+  (require 'package)
   (reset-package-source)
   (setq package-check-signature nil)
   (unless (or (package-installed-p 'dash)
@@ -135,23 +151,33 @@
   (global-set-key (kbd "C-c C-p r") 'reset-package-source)
   (global-set-key (kbd "C-c C-p i") 'package-install))
 
+;; (deftask-delay hairy/upgrade-library
+;;   "Upgrade library."
+;;   (package-refresh-contents t)
+;;   (with-current-buffer (get-buffer-create "*Packages*")
+;;     (package-menu-mode)
+;;     (package-menu-refresh)
+;;     (package-menu--generate nil t)
+;;     (package-menu-mark-upgrades)))
 
-;;;; Preload library.
-(defun configure-dash ()
-  "Configure dash-2.12.0"
-  (require-or-install 'dash)
-  (eval-after-load 'dash (dash-enable-font-lock)))
-
+;;;; Preload librarys.
 (deftask preload-library
   "Preload utils library"
-  (configure-dash)
+  (require-or-install 'dash)
   (require-or-install 's)
-  (require-or-install 'f))
+  (require-or-install 'f)
+  (eval-after-load 'dash (dash-enable-font-lock)))
 
-
+;;;; Default base
+(defvar hairy/default-font-size 110
+  "Hairy default font size scale.")
+
+(defun hairy/text-scaled-size (str size)
+  "Compute scaled size in buffer base on default font size."
+  (* (string-width str)
+     (/ size (float hairy/default-font-size))))
 
 ;;;; Hairy workspace
-
 (defvar hairy-dashboard-buffer-name "*Hairy*"
   "Hairy dashboard buffer name.")
 
@@ -225,6 +251,7 @@
   "Open todos layout.")
 
 (defun hairy/start-todos ()
+  (interactive)
   "Open todos layout."
   42)
 
@@ -232,12 +259,8 @@
 (defvar hairy-dashboard-action-projects
   (list :text "projects"
         :face 'hairy-dashboard-action-face-2
-        :handle 'hairy/start-projects)
+        :handle 'hairy/start-repo)
   "Open projects layout.")
-
-(defun hairy/start-projects ()
-  "Open projects layout."
-  42)
 
 (defvar hairy-dashboard-action-blog
   (list :text "blog"
@@ -246,6 +269,7 @@
   "Open blog layout.")
 
 (defun hairy/start-blog ()
+  (interactive)
   "Open blog layout."
   42)
 
@@ -270,15 +294,17 @@
 
 (defun hairy-dashboard/make-hr ()
   "Make hairy split-line text below the banner."
-  (s-pad-left 39 " "
-              (propertize (s-repeat hairy-dashboard-hr-length "_")
-                          'face 'hairy-dashboard-symbol-face)))
+  (s-pad-left
+   39 " "
+   (propertize (s-repeat hairy-dashboard-hr-length "_")
+               'face 'hairy-dashboard-symbol-face)))
 
 (defun hairy-dashboard/make-small-text ()
   "Make hairy small text."
-  (s-pad-left 40 " "
-              (propertize hairy-dashboard-small-text
-                          'face 'hairy-dashboard-small-text-face)))
+  (s-pad-left
+   40 " "
+   (propertize hairy-dashboard-small-text
+               'face 'hairy-dashboard-small-text-face)))
 
 (defun hairy-dashboard/render-header (max-width max-height)
   "Render hairy header."
@@ -300,8 +326,9 @@
          (arr    (s-split "" str t))
          (fst    (s-wrap (car arr) "[" "]"))
          (tails  (s-join "" (cdr arr))))
-    (insert-text-button (propertize fst 'face face)
-                        'action handle)
+    (insert-text-button
+     (propertize fst 'face face)
+     'action (lambda (btn) (handle)))
     (insert tails)))
 
 (defun hairy-dashboard/render-nav ()
@@ -326,7 +353,7 @@
       (newline)
       (hairy-mode))))
 
-(defun switch-to-hairy ()
+(defun hairy-dashboard/switch-to-buffer ()
   "Switch to Hairy."
   (interactive)
   (maximize-restore-emacs)
@@ -344,8 +371,8 @@
 
 (defvar hairy-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "p") 'layout-project)
-    (global-set-key (kbd "C-c C-q") 'switch-to-hairy)
+    (define-key map (kbd "p") 'hairy/start-repo)
+    (global-set-key (kbd "C-c C-q") 'hairy-dashboard/switch-to-buffer)
     map)
   "hairy-mode keymaps.")
 
@@ -356,15 +383,127 @@
         indent-tabs-mode nil
         font-lock-mode nil))
 
+(defun hairy-dashboard/get-buffer ()
+  "Get dashboard buffer."
+  (get-buffer hairy-buffer-name))
+
 (deftask hairy/greeting
   "Reset startup screen."
   (hairy-dashboard/create-buffer (selected-window))
   (add-hook 'window-size-change-functions 'hairy-dashboard/create-buffer)
-  (setq inhibit-startup-screen t)
-  (setq initial-buffer-choice (lambda () (get-buffer hairy-buffer-name))))
+  (setq inhibit-startup-screen t
+        initial-buffer-choice 'hairy-dashboard/get-buffer))
+
+;;;; Repository layout
+(defvar hairy-repo/sidebar-buffer-name "*Repositories*"
+  "Repository layout sidebar buffer name")
 
+(defvar hairy-repo/main-buffer-name "*Repository Info*"
+  "Repository layout info buffer name")
+
+(defvar hairy-repo/sidebar-window nil
+  "Repository layout sidebar side window.")
+
+(defvar hairy-repo/main-window nil
+  "Repository layout main buffer window.")
+
+(defface hairy-repo-header-face
+  '((t (:foreground "LightGray" :height 200)))
+  "Repository layout header face.")
+
+(defun hairy-repo/get-repo-type (project-root)
+  "Get projectile type of repo."
+  (gethash project-root projectile-project-type-cache))
+
+(defun hairy-repo/get-repos ()
+  "Get repository info from projectile."
+  (require-or-install 'projectile)
+  (let* ((projects (projectile-load-known-projects)))
+    (-map (lambda (project-root)
+            (list :name (f-filename project-root)
+                  :path (f-dirname project-root)
+                  :root project-root
+                  :vc (projectile-project-vcs project-root)
+                  :type (hairy-repo/get-repo-type project-root)))
+          projects)))
+
+(defun hairy-repo/render-repo-info (buf repo)
+  "Render repo details to main buffer when click sidebar repo."
+  (let* ((name (plist-get repo :name))
+         (vc   (plist-get repo :vc))
+         (root (plist-get repo :root)))
+    (with-current-buffer buf
+      (insert "Name")
+      (newline)
+      (insert name)
+      )))
+
+(defun hairy-repo/render-default-view (win buf)
+  "Render repo info default view."
+  ;; Respository
+  ;; -----------
+  ;; Next repo           Ctrl-N
+  ;; Prev repo           Ctrl-P
+  ;; Head repo           Ctrl-A
+  ;; Last repo           Ctrl-E
+  ;; Open repo           Ctrl-O
+  ;; Remo repo           Ctrl-K
+  (with-current-buffer buf
+    ;; (insert (concat "Ctrl-p " "Next repo."))
+    (let* ((w (window-body-width win))
+           (h (window-body-height win))
+           (header (propertize "Respository"
+                               'face 'hairy-repo-header-face))
+           (header-size (hairy/text-scaled-size header 200))
+           (header-center-width (- (1- w)
+                                   (- header-size (string-width header)))))
+      (print win)
+      (print w)
+      (print h)
+      (newline (- (/ h 2) 16))
+      (insert (s-center header-center-width header))
+      (newline 4)
+      ;;(insert (s-center w "--------------------"))
+      ;;(newline 3)
+      )
+    (switch-to-buffer buf)))
+
+(defun hairy/start-repo ()
+  "Open projects layout."
+  (interactive)
+  (maximize-emacs)
+  ;; Need delay a few seconds to fetch window size.
+  (run-with-timer
+   0.1 nil
+   (lambda ()
+     (let* ((side-buf (generate-new-buffer hairy-repo/sidebar-buffer-name))
+            (main-buf (generate-new-buffer hairy-repo/main-buffer-name)))
+       (setq hairy-repo/main-window (selected-window))
+       ;; Make sidebar buffer
+       (with-current-buffer side-buf
+         (let* ((repos (hairy-repo/get-repos)))
+           (-each repos
+             (lambda (repo)
+               (insert-text-button
+                (plist-get repo :name)
+                'action (lambda (btn)
+                          (hairy-repo/render-repo-info main-buf repo)
+                          ))
+               (newline)))
+           ;; Display to left side window.
+           ;; Remap buffer face.
+           (setq hairy-repo/sidebar-window
+                 (display-buffer-in-side-window side-buf
+                                                `((side . left))))
+           (print hairy-repo/sidebar-window)
+           ))
+       ;; Make main buffer
+       (hairy-repo/render-default-view hairy-repo/main-window
+                                       main-buf)
+       ))
+   ))
+
 ;;;; Editor
-
 (defun configure-editorconfig ()
   "Configure editorconfig"
   (require-or-install 'editorconfig)
@@ -400,19 +539,20 @@
 
 (defun configure-conding-system ()
   "Use utf-8 coding system."
-  (setq utf-translate-cjk-mode nil)
-  (prefer-coding-system 'utf-8)
-  (set-language-environment "UTF-8")
-  (set-default-coding-systems 'utf-8)
-  (set-buffer-file-coding-system 'utf-8)
-  (set-terminal-coding-system 'utf-8)
-  (set-keyboard-coding-system 'utf-8)
-  (set-selection-coding-system 'utf-8)
-  (setq locale-coding-system 'utf-8)
-  (setq coding-system-for-read 'utf-8)
-  (setq coding-system-for-write 'utf-8)
-  (setq-default buffer-file-coding-system 'utf-8-unix)
-  (setq-default file-name-coding-system 'utf-8-unix))
+  ;; (setq utf-translate-cjk-mode nil)
+  ;; (prefer-coding-system 'utf-8)
+  ;; (set-language-environment "UTF-8")
+  ;; (set-default-coding-systems 'utf-8)
+  ;; (set-buffer-file-coding-system 'utf-8)
+  ;; (set-terminal-coding-system 'utf-8)
+  ;; (set-keyboard-coding-system 'utf-8)
+  ;; (set-selection-coding-system 'utf-8)
+  ;; (setq locale-coding-system 'utf-8)
+  ;; (setq coding-system-for-read 'utf-8)
+  ;; (setq coding-system-for-write 'utf-8)
+  ;; (setq-default buffer-file-coding-system 'utf-8-unix)
+  ;; (setq-default file-name-coding-system 'utf-8-unix)
+  )
 
 (defun configure-frame-default ()
   "Configure default ui and frame size."
@@ -928,7 +1068,8 @@ _ALIST is ignored."
 (defun configure-icons ()
   "Configure icon font"
   (require-or-install 'all-the-icons)
-  (setq inhibit-compacting-font-caches t))
+  ;;(setq inhibit-compacting-font-caches t)
+  )
 
 (defun configure-perspective ()
   "Configure perspective."
