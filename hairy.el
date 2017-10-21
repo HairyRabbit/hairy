@@ -454,7 +454,7 @@
   (with-current-buffer buf
     (let* ((w (window-body-width win))
            (h (window-body-height win))
-           (header (propertize "Respository"
+           (header (propertize "Repositories"
                                'face 'hairy-repo-header-face)))
       (newline (- (/ h 2) 16))
       (hairy/insert-center w header t 'hairy-repo-header-face)
@@ -468,44 +468,54 @@
     (switch-to-buffer buf)))
 
 (defface hairy-repo-sidebar-header-face
-  '((t (:foreground "#9F9BB9" :face "Consolas 18")))
+  '((t (:foreground "#9F9BB9" :height 180)))
   "Repository layout sidebar header face.")
 
 (defface hairy-repo-sidebar-small-face
-  '((t (:foreground "LightGray" :face "Consolas 11")))
+  '((t (:foreground "grey55" :height 120)))
   "Repository layout sidebar small face.")
+
+(defun hairy-repo/render-sidebar-headers ()
+  "Render repo layout sidebar headers."
+  (let ((header (propertize "PROJECTILE LIST"
+                            'face 'hairy-repo-sidebar-header-face))
+        (small (propertize "workspace"
+                           'face 'hairy-repo-sidebar-small-face)))
+    (newline 2)
+    (insert header)
+    (newline)
+    (insert small)
+    (newline 4)))
+
+(defun hairy-repo/render-sidebar-empty-view ()
+  "Render repo layout sidebar empty view."
+  (insert "+ Add a new repository"))
+
+(defun hairy-repo/render-sidebar-list-view (repos main-buf)
+  "Render repo layout sidebar list view."
+  (-each repos
+    (lambda (repo)
+      (let* ((name (plist-get repo :name))
+             (root (plist-get repo :root)))
+        (insert-text-button
+         name
+         'action (lambda (btn)
+                   (hairy-repo/render-repo-info main-buf repo)
+                   ))
+        (insert "(master)")
+        (newline)
+        (insert root)
+        (newline 2)))))
 
 (defun hairy/render-sidebar (buf main-buf)
   "Render repo layout sidebar."
   (with-current-buffer buf
-    (let* ((header (propertize "PROJECTILE LIST"
-                               'face 'hairy-repo-sidebar-header-face))
-           (small (propertize "workspace"
-                              'face 'hairy-repo-sidebar-small-face))
-           (repos (hairy-repo/get-repos)))
-      ;; Draw header.
-      (newline 2)
-      (insert header)
-      (newline)
-      (insert small)
-      (newline 4)
-      ;; Draw list
-      (-each repos
-        (lambda (repo)
-          (let* ((name (plist-get repo :name))
-                 (root (plist-get repo :root)))
-            (insert-text-button
-             name
-             'action (lambda (btn)
-                       (hairy-repo/render-repo-info main-buf repo)
-                       ))
-            (insert  "(master)")
-            (newline)
-            (insert root)
-            (newline 2))
-          ))
-      ))
-  )
+    (let ((repos (hairy-repo/get-repos)))
+      (hairy-repo/render-sidebar-headers)
+      (setq-local body-point (point))
+      (if (not repos)
+          (hairy-repo/render-sidebar-empty-view)
+        (hairy-repo/render-sidebar-list-view repos main-buf)))))
 
 (defun hairy/start-repo ()
   "Open projects layout."
