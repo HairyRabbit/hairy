@@ -169,13 +169,22 @@
   (eval-after-load 'dash (dash-enable-font-lock)))
 
 ;;;; Default base
-(defvar hairy/default-font-size 110
-  "Hairy default font size scale.")
-
-(defun hairy/text-scaled-size (str size)
+(defun hairy/text-scaled-size (str face)
   "Compute scaled size in buffer base on default font size."
-  (* (string-width str)
-     (/ size (float hairy/default-font-size))))
+  (let ((face-size (float (face-attribute face :height)))
+        (default-size (float (face-attribute 'default :height))))
+    (ceiling (* (string-width str)
+                (/ face-size default-size)))))
+
+(defun hairy/insert-center (width str lines &optional face)
+  "Insert text to buffer and center the text."
+  (if (not face) (insert (s-center width str))
+    (let* ((str-width (hairy/text-scaled-size str face))
+           (len (string-width str))
+           (compute-width (- (1- width)
+                             (- str-width len))))
+      (insert (s-center compute-width str))))
+  (when lines (newline lines)))
 
 ;;;; Hairy workspace
 (defvar hairy-dashboard-buffer-name "*Hairy*"
@@ -433,40 +442,70 @@
          (vc   (plist-get repo :vc))
          (root (plist-get repo :root)))
     (with-current-buffer buf
+      (delete-region body-point (buffer-end 1))
       (insert "Name")
       (newline)
       (insert name)
+      (insert-button "Open Project")
       )))
 
 (defun hairy-repo/render-default-view (win buf)
   "Render repo info default view."
-  ;; Respository
-  ;; -----------
-  ;; Next repo           Ctrl-N
-  ;; Prev repo           Ctrl-P
-  ;; Head repo           Ctrl-A
-  ;; Last repo           Ctrl-E
-  ;; Open repo           Ctrl-O
-  ;; Remo repo           Ctrl-K
   (with-current-buffer buf
-    ;; (insert (concat "Ctrl-p " "Next repo."))
     (let* ((w (window-body-width win))
            (h (window-body-height win))
            (header (propertize "Respository"
-                               'face 'hairy-repo-header-face))
-           (header-size (hairy/text-scaled-size header 200))
-           (header-center-width (- (1- w)
-                                   (- header-size (string-width header)))))
-      (print win)
-      (print w)
-      (print h)
+                               'face 'hairy-repo-header-face)))
       (newline (- (/ h 2) 16))
-      (insert (s-center header-center-width header))
-      (newline 4)
-      ;;(insert (s-center w "--------------------"))
-      ;;(newline 3)
-      )
+      (hairy/insert-center w header t 'hairy-repo-header-face)
+      (hairy/insert-center w "--------------------" 4)
+      (setq-local body-point (point))
+      (hairy/insert-center w "Move to next project       Ctrl-N   " 2)
+      (hairy/insert-center w "Move to prev project       Ctrl-P   " 2)
+      (hairy/insert-center w "Open project main file     Ctrl-O   " 2)
+      (hairy/insert-center w "Remove project from cache  Ctrl-R   " 2)
+      (hairy/insert-center w "Add a project              Drop     " 2))
     (switch-to-buffer buf)))
+
+(defface hairy-repo-sidebar-header-face
+  '((t (:foreground "#9F9BB9" :face "Consolas 18")))
+  "Repository layout sidebar header face.")
+
+(defface hairy-repo-sidebar-small-face
+  '((t (:foreground "LightGray" :face "Consolas 11")))
+  "Repository layout sidebar small face.")
+
+(defun hairy/render-sidebar (buf main-buf)
+  "Render repo layout sidebar."
+  (with-current-buffer buf
+    (let* ((header (propertize "PROJECTILE LIST"
+                               'face 'hairy-repo-sidebar-header-face))
+           (small (propertize "workspace"
+                              'face 'hairy-repo-sidebar-small-face))
+           (repos (hairy-repo/get-repos)))
+      ;; Draw header.
+      (newline 2)
+      (insert header)
+      (newline)
+      (insert small)
+      (newline 4)
+      ;; Draw list
+      (-each repos
+        (lambda (repo)
+          (let* ((name (plist-get repo :name))
+                 (root (plist-get repo :root)))
+            (insert-text-button
+             name
+             'action (lambda (btn)
+                       (hairy-repo/render-repo-info main-buf repo)
+                       ))
+            (insert  "(master)")
+            (newline)
+            (insert root)
+            (newline 2))
+          ))
+      ))
+  )
 
 (defun hairy/start-repo ()
   "Open projects layout."
@@ -480,23 +519,11 @@
             (main-buf (generate-new-buffer hairy-repo/main-buffer-name)))
        (setq hairy-repo/main-window (selected-window))
        ;; Make sidebar buffer
-       (with-current-buffer side-buf
-         (let* ((repos (hairy-repo/get-repos)))
-           (-each repos
-             (lambda (repo)
-               (insert-text-button
-                (plist-get repo :name)
-                'action (lambda (btn)
-                          (hairy-repo/render-repo-info main-buf repo)
-                          ))
-               (newline)))
-           ;; Display to left side window.
-           ;; Remap buffer face.
-           (setq hairy-repo/sidebar-window
-                 (display-buffer-in-side-window side-buf
-                                                `((side . left))))
-           (print hairy-repo/sidebar-window)
-           ))
+       (hairy/render-sidebar side-buf main-buf)
+       (setq hairy-repo/sidebar-window
+             (display-buffer-in-side-window side-buf
+                                            `((side . left))))
+       (set-window-margins hairy-repo/sidebar-window 2 0)
        ;; Make main buffer
        (hairy-repo/render-default-view hairy-repo/main-window
                                        main-buf)
@@ -575,7 +602,7 @@
   (mouse-avoidance-mode 'animate)
   (setq column-number-mode t)
   (set-face-attribute 'default nil
-                      :family "Consolas"
+                      :font "Consolas 12"
                       :foreground "#372620"
                       :background "FloralWhite")
   (set-face-attribute 'fringe nil
@@ -586,56 +613,6 @@
   (setq fill-column 80)
   (setq-default fci-rule-column 80)
   (setq-default indent-tabs-mode nil))
-
-(defun render-list-todos ()
-  "Render todos list.
-
-● foo
-● bar
-"
-  (s-join "\n"
-   (-map (lambda (item)
-           (concat "○" " " item)
-           ) (list "foo" "bar" "baz" "qux")))
-  )
-
-(defun render-banner ()
-  "Render banner at startup buffer."
-  (let ((char-\[ (set-font-color "[" "lightgray"))
-        (char-\] (set-font-color "]" "lightgray"))
-        (char-\H (set-font-color "H" "SlateBlue"))
-        (char-\A (set-font-color "A" "DeepSkyBlue"))
-        (char-\I (set-font-color "I" "DodgerBlue"))
-        (char-\Y (set-font-color "Y" "plum"))
-        (char-\R (set-font-color "R" "purple"))
-        (char-\B (set-font-color "B" "salmon")))
-    (s-join "  " (list char-\[ char-\H char-\A "I" "R" char-\Y char-\]
-                       " "
-                       char-\R "A" "B" char-\B char-\I "T" ))))
-
-(defun render-hr ()
-  "Render hr at below banner."
-  (s-pad-left 39 " " (set-font-color "__________" "lightgray")))
-
-(defun render-small ()
-  "Render small below banner."
-  (s-pad-left 40 " " (set-font-color "echo" "DodgerBlue")))
-
-(defun render-nav-item (str color onpress)
-  "Render Navigator item."
-  (let* ((arr (s-split "" str t))
-         (fst (s-wrap (car arr) "[" "]"))
-         (tails (s-join "" (cdr arr))))
-    (insert-text-button (set-font-color fst color) 'action onpress)
-    (insert tails)))
-
-(defun render-nav ()
-  "Render navigator."
-  (render-nav-item "todos" "purple" (lambda (_btn) (print 42)))
-  (insert (s-repeat 6 " "))
-  (render-nav-item "projects" "plum" (lambda (_btn) (layout-project)))
-  (insert (s-repeat 6 " "))
-  (render-nav-item "blog" "SlateBlue" (lambda (_btn) (print 42))))
 
 ;; (defun neotree-projectile ()
 ;;   "Open neotree with projectile as root and open node for current file.
@@ -912,8 +889,6 @@ _ALIST is ignored."
       (newline)
       (hairy-mode))))
 
-
-
 (defun configure-restart-emacs ()
   "Restart emacs"
   (require-or-install 'restart-emacs)
@@ -951,11 +926,6 @@ _ALIST is ignored."
   (setq emms-player-list '(emms-player-mplayer))
   (setq emms-stream-default-action "play")
   (emms-player-for '(*track* (type . file) (name . "d:/MPlayer/test.mp3")))
-  )
-
-(deftask editor-delay
-  "Reset editor after init."
-  ;; (run-with-timer (ms 100) nil 'configure-emms)
   )
 
 
@@ -1067,9 +1037,7 @@ _ALIST is ignored."
   (run-with-timer (ms 100) nil 'configure-jump))
 
 
-
 ;;; Projects
-
 (defun configure-icons ()
   "Configure icon font"
   (require-or-install 'all-the-icons)
@@ -1094,27 +1062,27 @@ _ALIST is ignored."
   (setq eshell-highlight-prompt nil
         eshell-prompt-function 'epe-theme-lambda)
 
-  (require 'em-alias)
-  ;; commons
-  (create-eshell-alias "l" "ls")
-  (create-eshell-alias "la" "ls -lAFh")
-  (create-eshell-alias "lr" "ls -tRFh")
-  (create-eshell-alias "lt" "ls -ltFh")
-  (create-eshell-alias "ll" "ls -l")
-  (create-eshell-alias "ldot" "ls -ld .*")
-  (create-eshell-alias "lart" "ls -1FSsh")
-  (create-eshell-alias "lart" "ls -1Fcart")
-  (create-eshell-alias "lrt" "ls -1Fcrt")
-  ;; git
-  (create-eshell-alias "g" "git")
-  (create-eshell-alias "ga" "git add")
-  (create-eshell-alias "gaa" "git add --all")
-  (create-eshell-alias "gau" "git add --update")
-  (create-eshell-alias "gb" "git branch")
-  (create-eshell-alias "gba" "git branch -a")
-  (create-eshell-alias "gbd" "git branch -d")
-  (create-eshell-alias "gbda" "git branch --no-color --merged | command grep -vE \"^(\*|\s*(master|develop|dev)\s*$)\" | command xargs -n 1 git branch -d")
-  )
+  (with-eval-after-load 'em-alias
+    ;; commons
+    (create-eshell-alias "l" "ls")
+    (create-eshell-alias "la" "ls -lAFh")
+    (create-eshell-alias "lr" "ls -tRFh")
+    (create-eshell-alias "lt" "ls -ltFh")
+    (create-eshell-alias "ll" "ls -l")
+    (create-eshell-alias "ldot" "ls -ld .*")
+    (create-eshell-alias "lart" "ls -1FSsh")
+    (create-eshell-alias "lart" "ls -1Fcart")
+    (create-eshell-alias "lrt" "ls -1Fcrt")
+    ;; git
+    (create-eshell-alias "g" "git")
+    (create-eshell-alias "ga" "git add")
+    (create-eshell-alias "gaa" "git add --all")
+    (create-eshell-alias "gau" "git add --update")
+    (create-eshell-alias "gb" "git branch")
+    (create-eshell-alias "gba" "git branch -a")
+    (create-eshell-alias "gbd" "git branch -d")
+    (create-eshell-alias "gbda" "git branch --no-color --merged | command grep -vE \"^(\*|\s*(master|develop|dev)\s*$)\" | command xargs -n 1 git branch -d")
+    ))
 
 (defun repl-open ()
   "Open REPL buffer"
@@ -1151,7 +1119,6 @@ _ALIST is ignored."
 
 
 ;;; Javascript
-
 (defun configure-nodejs-repl ()
   "Configure Nodejs repl"
   (let* ((command "node")
@@ -1205,7 +1172,6 @@ _ALIST is ignored."
   (configure-json-mode)
   (configure-electric-operator)
   ;; Templates
-  ;;()
   )
 
 (deftask javascript
