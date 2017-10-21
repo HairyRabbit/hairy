@@ -485,32 +485,60 @@
     (insert header)
     (newline)
     (insert small)
-    (newline 4)))
+    (newline 3)))
 
 (defun hairy-repo/render-sidebar-empty-view ()
   "Render repo layout sidebar empty view."
   (insert "+ Add a new repository"))
 
+(defface hairy-repo-sidebar-item-name-face
+  '((t (:foreground "Black" :height 130)))
+  "Repository layout sidebar small face.")
+
+(defface hairy-repo-sidebar-item-branch-face
+  '((t (:foreground "#9F9BB9" :height 100)))
+  "Repository layout sidebar small face.")
+
+(defface hairy-repo-sidebar-item-root-face
+  '((t (:foreground "gray45" :height 90)))
+  "Repository layout sidebar small face.")
+
 (defun hairy-repo/render-sidebar-list-view (repos main-buf)
   "Render repo layout sidebar list view."
+  (require-or-install 'all-the-icons)
   (-each repos
     (lambda (repo)
       (let* ((name (plist-get repo :name))
              (root (plist-get repo :root)))
+        (insert (all-the-icons-octicon "repo"
+                                       :height 1.4
+                                       :face '(:foreground "#372B68")))
+        (insert " ")
         (insert-text-button
-         name
+         (propertize (s-upper-camel-case name)
+                     'face 'hairy-repo-sidebar-item-name-face)
          'action (lambda (btn)
                    (hairy-repo/render-repo-info main-buf repo)
                    ))
-        (insert "(master)")
+        (insert " ")
+        (insert (propertize "(master)"
+                            'face 'hairy-repo-sidebar-item-branch-face))
         (newline)
-        (insert root)
+        (insert "   ")
+        (insert (propertize root
+                            'face 'hairy-repo-sidebar-item-root-face))
         (newline 2)))))
+
+(defface hairy-repo-sidebar-default-face
+  '((t (:background "#F5EBDD")))
+  "Repository layout sidebar default buffer face.")
 
 (defun hairy/render-sidebar (buf main-buf)
   "Render repo layout sidebar."
   (with-current-buffer buf
     (let ((repos (hairy-repo/get-repos)))
+      (setq buffer-face-mode-face 'hairy-repo-sidebar-default-face)
+      (buffer-face-mode)
       (hairy-repo/render-sidebar-headers)
       (setq-local body-point (point))
       (if (not repos)
@@ -534,6 +562,7 @@
              (display-buffer-in-side-window side-buf
                                             `((side . left))))
        (set-window-margins hairy-repo/sidebar-window 2 0)
+       (set-window-fringes hairy-repo/sidebar-window 0 0)
        ;; Make main buffer
        (hairy-repo/render-default-view hairy-repo/main-window
                                        main-buf)
@@ -618,6 +647,7 @@
   (set-face-attribute 'fringe nil
                       :foreground (face-foreground 'default)
                       :background (face-background 'default))
+  (set-face-foreground 'vertical-border "#F7F2E9")
   (require-or-install 'fill-column-indicator)
   (fci-mode 1)
   (setq fill-column 80)
