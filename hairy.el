@@ -399,7 +399,7 @@
 (deftask hairy/greeting
   "Reset startup screen."
   (hairy-dashboard/create-buffer (selected-window))
-  (add-hook 'window-size-change-functions 'hairy-dashboard/create-buffer)
+  ;; (add-hook 'window-size-change-functions 'hairy-dashboard/create-buffer)
   (setq inhibit-startup-screen t
         initial-buffer-choice 'hairy-dashboard/get-buffer))
 
@@ -466,7 +466,8 @@
       (hairy/insert-center w "Remove project from cache  Ctrl-R   " 2)
       (hairy/insert-center w "Add a project              Drop     " 2))
     (switch-to-buffer buf)))
-
+
+;;; Sidebar window
 (defface hairy-repo-sidebar-header-face
   '((t (:foreground "#9F9BB9" :height 180)))
   "Repository layout sidebar header face.")
@@ -887,47 +888,6 @@ _ALIST is ignored."
 ;;          (string= (buffer-name buf) "*Shell Command Output*")
 ;;          (with-current-buffer buf
 ;;            (ansi-color-apply-on-region (point-min) (point-max))))))
-
-(defvar hairy-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "p") 'layout-project)
-    (global-set-key (kbd "C-c C-q") 'switch-to-hairy)
-    map)
-  "hairy-mode keymaps.")
-
-(define-derived-mode hairy-mode special-mode "Hairy"
-  "Hairy Rabbit emacs greeting."
-  (setq mode-line-format nil
-        buffer-read-only t
-        indent-tabs-mode nil
-        font-lock-mode nil))
-
-(defvar hairy-buffer-name "*Hairy*" "Hairy buffer name")
-
-;; TODO use small-view when window-max-width too small.
-(defun hairy/render-header (max-width max-height)
-  "Render hairy header."
-  (newline (- (/ max-height 2) 1))
-  (insert (s-center max-width (render-banner)))
-  (newline)
-  (insert (s-center max-width (render-hr)))
-  (newline)
-  (insert (s-center max-width (render-small))))
-
-(defun create-hairy-buffer (window)
-  "Create *Hairy* buffer."
-  (let ((window-width (window-body-width))
-        (window-height (window-body-height))
-        (body-point 0))
-    (with-current-buffer (get-buffer-create hairy-buffer-name)
-      (read-only-mode 0)
-      (erase-buffer)
-      (hairy/render-header window-width window-height)
-      (newline 4)
-      (insert (s-repeat (/ (- window-width 36) 2) " "))
-      (render-nav)
-      (newline)
-      (hairy-mode))))
 
 (defun configure-restart-emacs ()
   "Restart emacs"
