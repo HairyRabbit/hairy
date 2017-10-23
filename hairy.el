@@ -368,9 +368,9 @@
   (maximize-restore-emacs)
   (neotree-hide)
   (if (window-live-p layout-emacs-window)
-      (delete-other-windows layout-emacs-window)
+      (delete-other-windows-internal layout-emacs-window)
     (progn
-      (delete-other-windows)
+      (delete-other-windows-internal)
       (setq layout-emacs-window (selected-window))))
   (when (not (get-buffer hairy-dashboard-buffer-name))
     (hairy-dashboard/create-buffer layout-emacs-window))
@@ -394,7 +394,7 @@
 
 (defun hairy-dashboard/get-buffer ()
   "Get dashboard buffer."
-  (get-buffer hairy-buffer-name))
+  (get-buffer hairy-dashboard-buffer-name))
 
 (deftask hairy/greeting
   "Reset startup screen."
@@ -409,12 +409,6 @@
 
 (defvar hairy-repo/main-buffer-name "*Repository Info*"
   "Repository layout info buffer name")
-
-(defvar hairy-repo/sidebar-window nil
-  "Repository layout sidebar side window.")
-
-(defvar hairy-repo/main-window nil
-  "Repository layout main buffer window.")
 
 (defface hairy-repo-header-face
   '((t (:foreground "LightGray" :height 200)))
@@ -449,10 +443,14 @@
       (insert-button "Open Project")
       )))
 
-(defun hairy-repo/render-default-view (win buf)
+(defvar hairy-repo-main-buffer-renderer-p nil
+  "Hairy repo main buffer was renderer.")
+
+(defun hairy-repo/render-default-view (buf)
   "Render repo info default view."
   (with-current-buffer buf
-    (let* ((w (window-body-width win))
+    (let* ((win (selected-window))
+           (w (window-body-width win))
            (h (window-body-height win))
            (header (propertize "Repositories"
                                'face 'hairy-repo-header-face)))
@@ -465,9 +463,10 @@
       (hairy/insert-center w "Open project main file     Ctrl-O   " 2)
       (hairy/insert-center w "Remove project from cache  Ctrl-R   " 2)
       (hairy/insert-center w "Add a project              Drop     " 2))
+    (setq hairy-repo-main-buffer-renderer-p t)
     (switch-to-buffer buf)))
 
-;;; Sidebar window
+;;; Repo layout sidebar window
 (defface hairy-repo-sidebar-header-face
   '((t (:foreground "#9F9BB9" :height 180)))
   "Repository layout sidebar header face.")
@@ -476,11 +475,17 @@
   '((t (:foreground "grey55" :height 120)))
   "Repository layout sidebar small face.")
 
+(defvar hairy-repo-sidebar-header-text "PROJECTILE LIST"
+  "Repository layout sidebar header text.")
+
+(defvar hairy-repo-sidebar-small-text "workspace"
+  "Repository layout sidebar small text.")
+
 (defun hairy-repo/render-sidebar-headers ()
   "Render repo layout sidebar headers."
-  (let ((header (propertize "PROJECTILE LIST"
+  (let ((header (propertize hairy-repo-sidebar-header-text
                             'face 'hairy-repo-sidebar-header-face))
-        (small (propertize "workspace"
+        (small (propertize hairy-repo-sidebar-small-text
                            'face 'hairy-repo-sidebar-small-face)))
     (newline 2)
     (insert header)
@@ -507,6 +512,7 @@
 (defun hairy-repo/render-sidebar-list-view (repos main-buf)
   "Render repo layout sidebar list view."
   (require-or-install 'all-the-icons)
+  (setq inhibit-compacting-font-caches t)
   (-each repos
     (lambda (repo)
       (let* ((name (plist-get repo :name))
@@ -534,7 +540,10 @@
   '((t (:background "#F5EBDD")))
   "Repository layout sidebar default buffer face.")
 
-(defun hairy/render-sidebar (buf main-buf)
+(defvar hairy-repo-sidebar-buffer-renderer-p nil
+  "Hairy repo sidebar was buffer renderer.")
+
+(defun hairy-repo/render-sidebar (buf main-buf)
   "Render repo layout sidebar."
   (with-current-buffer buf
     (let ((repos (hairy-repo/get-repos)))
@@ -544,7 +553,8 @@
       (setq-local body-point (point))
       (if (not repos)
           (hairy-repo/render-sidebar-empty-view)
-        (hairy-repo/render-sidebar-list-view repos main-buf)))))
+        (hairy-repo/render-sidebar-list-view repos main-buf))
+      (setq hairy-repo-sidebar-buffer-renderer-p t))))
 
 (defun hairy/start-repo ()
   "Open projects layout."
@@ -554,29 +564,372 @@
   (run-with-timer
    0.1 nil
    (lambda ()
-     (let* ((side-buf (generate-new-buffer hairy-repo/sidebar-buffer-name))
-            (main-buf (generate-new-buffer hairy-repo/main-buffer-name)))
-       (setq hairy-repo/main-window (selected-window))
+     (let* ((side-buf (get-buffer-create hairy-repo/sidebar-buffer-name))
+            (main-buf (get-buffer-create hairy-repo/main-buffer-name)))
        ;; Make sidebar buffer
-       (hairy/render-sidebar side-buf main-buf)
-       (setq hairy-repo/sidebar-window
-             (display-buffer-in-side-window side-buf
-                                            `((side . left))))
+       (unless hairy-repo-sidebar-buffer-renderer-p
+         (hairy-repo/render-sidebar side-buf main-buf))
+       (setq-local hairy-repo/sidebar-window
+                   (display-buffer-in-side-window side-buf `((side . left))))
        (set-window-margins hairy-repo/sidebar-window 2 0)
        (set-window-fringes hairy-repo/sidebar-window 0 0)
+       ;; Set window width
+       (enlarge-window-horizontally
+        (- (window-width hairy-repo/sidebar-window) 25))
+       (with-current-buffer side-buf
+         (setq window-size-fixed 'width))
        ;; Make main buffer
-       (hairy-repo/render-default-view hairy-repo/main-window
-                                       main-buf)
-       ))
-   ))
+       (unless hairy-repo-main-buffer-renderer-p
+         (hairy-repo/render-default-view main-buf))
+       (display-buffer main-buf)))))
+
+;;;; Projectile
+(defmacro defproject (name &optional doc &rest args)
+  ""
+  )
+(defun hairy-projectile/create-project (root template)
+  ;; (f-write)
+  )
+
+;;;; Projectile react
+(defconst hairy-projectile/template-.gitignore "\
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+
+# Directory for instrumented libs generated by jscoverage/JSCover
+lib-cov
+
+# Coverage directory used by tools like istanbul
+coverage
+
+# nyc test coverage
+.nyc_output
+
+# Grunt intermediate storage (http://gruntjs.com/creating-plugins#storing-task-files)
+.grunt
+
+# node-waf configuration
+.lock-wscript
+
+# Compiled binary addons (http://nodejs.org/api/addons.html)
+build/Release
+
+# Dependency directories
+node_modules
+jspm_packages
+
+# Optional npm cache directory
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Flowtype
+flow-bin
+flow-typed/npm
+
+# Webpack Config
+webpack.config.js
+.cache-loader
+
+# Emacs tmp file
+\#*\#
+
+# Project
+tmp
+dist
+log
+"
+  "Git ignore file '.gitignore' template.")
+
+(defconst hairy-projectile/template-.editorconfig "\
+root = true
+
+[*]
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
+indent_style = space
+indent_size = 2
+
+[{*.json,.babelrc,.eslintrc,.stylelintrc,travis.yml}]
+indent_size = 4
+
+[{.babelrc, .eslintrc, .stylelintrc}]
+emacs_mode = json
+"
+  "Editorconfig file.")
+
+(defconst hairy-projectile/template-.eslintrc "\
+{
+    \"env\": {
+        \"browser\": true,
+        \"es6\": true,
+        \"node\": true,
+        \"worker\": true,
+        \"jest\": true
+    },
+    \"extends\": [
+        \"eslint:recommended\",
+        \"plugin:flowtype/recommended\",
+        \"plugin:react/recommended\"
+    ],
+    \"parserOptions\": {
+        \"ecmaVersion\": 8,
+        \"ecmaFeatures\": {
+            \"sourceType\": \"module\",
+            \"impliedStrict\": true,
+            \"experimentalObjectRestSpread\": true,
+            \"jsx\": true
+        },
+        \"sourceType\": \"module\"
+    },
+    \"parser\": \"babel-eslint\",
+    \"plugins\": [
+        \"react\",
+        \"flowtype\"
+    ],
+    \"rules\": {
+        \"indent\": \"off\",
+        \"linebreak-style\": [
+            \"error\",
+            \"unix\"
+        ],
+        \"quotes\": [
+            \"error\",
+            \"single\",
+            {
+                \"allowTemplateLiterals\": true
+            }
+        ],
+        \"semi\": [
+            \"error\",
+            \"never\"
+        ],
+        \"no-console\": [
+            \"off\"
+        ],
+        \"no-unused-vars\": [
+            \"warn\"
+        ]
+    }
+}
+"
+  "React Eslint config file.")
+
+(defconst hairy-projectile/template-.stylelintrc "\
+{
+    \"rules\": {
+
+    }
+}
+"
+  "React Stylelint config file.")
+
+(defconst hairy-projectile/template-.babelrc "\
+{
+    \"presets\": [\"react\", [\"env\", {
+        \"target\": {
+            \"browsers\": [\"last 1 Chrome versions\"]
+        },
+        \"modules\": false,
+        \"loose\": true
+    }]],
+    \"plugins\": [
+        [\"transform-object-rest-spread\", { \"useBuiltIns\": true } ],
+        \"syntax-dynamic-import\",
+        \"transform-class-properties\",
+        \"lodash\"
+    ],
+    \"env\": {
+        \"test\": {
+            \"plugins\": [\"transform-es2015-modules-commonjs\"]
+        }
+    }
+}
+"
+  "React babel config file.")
+
+(defconst hairy-projectile/template-jest.config.js "\
+module.exports = {
+    \"verbose\": true,
+    \"moduleNameMapper\": {
+        \"\\.css$\": \"identity-obj-proxy\",
+        \"\\.(webp|jpg|png|svg)$\": \"<rootDir>/scripts/fileTransformer.js\"
+    }
+}
+"
+  "React Jest config file.")
+
+(defconst hairy-projectile/template-postcss.config.js "\
+module.exports = (ctx) => {
+  return {
+    plugins: [
+      require('postcss-cssnext')(),
+      require('stylelint')(),
+      require('postcss-short')(),
+      require('postcss-easings')(),
+      require('postcss-strip-inline-comments')()
+    ],
+    syntax: require('postcss-scss')
+  }
+}
+"
+  "React Postcss config file.")
+
+(defconst hairy-projectile/template-webpack.config.js "\
+const path = require('path')
+const webpack = require('webpack')
+const pkg = require('./package.json')
+const HTMLWebpackPlugin = require('html-webpack-plugin')
+const HTMLWebpackTemplate = require('html-webpack-template')
+
+module.exports = function (env) {
+  const src = path.resolve('src')
+  const tmp = path.resolve('tmp')
+  const images = path.resolve('public/images')
+  const fonts = path.resolve('public/fonts')
+
+  const entry = {
+    app: path.resolve(src, 'boot.js')
+  }
+
+  const output = {
+    path: tmp,
+    publicPath: '/',
+    filename: '[name].js'
+  }
+
+  const module = {
+    rules: [
+      // JavaScripts
+      { test: /\.js$/, enforce: 'pre', use: 'eslint-loader' },
+      { test: /\.js$/, use: 'babel-loader' },
+
+      // Styles
+      { test: /\.css$/, use: [
+	      'style-loader?sourceMap',
+	      'css-loader?sourceMap&module&modules&importLoaders=1&camelCase',
+	      'postcss-loader?sourceMap'
+      ]},
+
+      // Images
+      { test: /\.(webp|png|jpg|svg|eot|ttf|woff|woff2)$/, use: 'url-loader' }
+    ]
+  }
+
+  const resolve = {
+    alias: {}
+  }
+
+  const plugins = [
+    new HTMLWebpackPlugin({
+      title: 'webpack',
+      inject: true,
+      template: HTMLWebpackTemplate
+    })
+  ]
+
+  const devtool = 'source-map'
+
+  const devServer = {
+    publicPath: '/',
+    contentBase: tmp,
+    hot: true,
+    host: '0.0.0.0',
+    port: '8080'
+  }
+
+  const cache = true
+
+  return {
+    entry,
+    output,
+    module,
+    resolve,
+    plugins,
+    devtool,
+    devServer,
+    cache
+  }
+}
+"
+  "React Webpack config file.")
+
+(defconst hairy-projectile/template-package.json "\
+{
+    \"name\": \"eth-web\",
+    \"version\": \"0.0.1\",
+    \"main\": \"index.js\",
+    \"license\": \"Unlicense\",
+    \"repository\": \"http://yuffiy@git.meiyouka.com/Ethereum/eth-www.git\",
+    \"author\": [
+        \"YF.W <631190613@qq.com>\"
+    ],
+    \"scripts\": {
+        \"start\": \"cross-env NODE_ENV=development node scripts/start.js\"
+    }
+}
+"
+  "React package.json.")
+
+(defproject react
+  "The react project."
+  :files '((config . '(".gitignore"
+                       ".editorconfig"
+                       ".eslintrc"
+                       ".stylelintrc"
+                       ".babelrc"
+                       ".flowconfig"
+                       "package.json"
+                       "jest.config.js"
+                       "postcss.config.js"
+                       "webpack.config.js"))
+           (directory . '("src/"
+                          "src/components/"
+                          "src/helpers/"
+                          "src/view/"
+                          "src/core/"
+                          "tmp/"
+                          "dist/"
+                          "scripts/"
+                          "public/"
+                          "public/images/"
+                          "public/fonts/"
+                          "config/"
+                          "log/"))
+           (file . '("src/index.js"
+                     "src/boot.js"
+                     "src/core/index.js"
+                     "src/core/example/index.js"
+                     "src/core/example/types/index.js"
+                     "src/core/example/types/example.js"
+                     "src/core/example/states/index.js"
+                     "src/core/example/states/example.js"
+                     "src/view/index.jsx"
+                     "src/view/example/index.jsx"
+                     "src/view/example/style.css"))
+           )
+  :start "yarn start"
+  :test "yarn test"
+  :build "yarn build"
+  :deploy "yarn deploy"
+  )
 
 ;;;; Editor
 (defun configure-editorconfig ()
   "Configure editorconfig"
   (require-or-install 'editorconfig)
   (require-or-install 'editorconfig-custom-majormode)
-  (editorconfig-mode 1)
-  (add-hook 'editorconfig-custom-hook 'editorconfig-custom-majormode))
+  (add-hook 'editorconfig-custom-hook 'editorconfig-custom-majormode)
+  (editorconfig-mode 1))
 
 (defun configure-auto-file ()
   "Auto file save, backup, read"
@@ -623,6 +976,7 @@
   ;; (cnfonts-enable)
   (require-or-install 'unicode-fonts)
   (unicode-fonts-setup)
+  (setq inhibit-compacting-font-caches t)
   (set-fontset-font "fontset-default" nil
                     (font-spec :size 20 :name "Symbola"))
   )
@@ -929,9 +1283,7 @@ _ALIST is ignored."
   )
 
 
-
 ;;;; Fast coding
-
 (defun configure-undo-redo ()
   "Configure undo and redo."
   (setq kill-ring-max 200))
@@ -1444,3 +1796,16 @@ _ALIST is ignored."
 ;; + yasnippet (ELPA)
 
 ;;; hairy.el ends here
+
+
+;; (f-write (symbol-value (intern-soft "hairy-projectile/template-.gitignore"))
+;;          'utf-8
+;;          "f:/hairy/projtest/.gitignore")
+
+;; func: goto-config
+;; func: goto-view
+;; func: goto-core
+;; func: restart-server
+;; feature: auto restart server when config changed.
+;; feature: list deps
+;; (start-process "webpack-dev-server" "WebpackDevServer" "yarn" "webpack-dev-server" "--hot")
