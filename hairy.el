@@ -1007,7 +1007,9 @@ module.exports = function (env) {
   (fci-mode 1)
   (setq fill-column 80)
   (setq-default fci-rule-column 80)
-  (setq-default indent-tabs-mode nil))
+  (setq-default indent-tabs-mode nil)
+  (require-or-install 'aggressive-indent)
+  (global-aggressive-indent-mode 1))
 
 ;; (defun neotree-projectile ()
 ;;   "Open neotree with projectile as root and open node for current file.
@@ -1503,6 +1505,8 @@ _ALIST is ignored."
                                         (cons "let"   "let ")
                                         (cons "const" "const ")
                                         (cons "var"   "var ")
+                                        (cons "<" nil)
+                                        (cons ">" nil)
                                         ;; (cons "if" "if ")
                                         ;; (cons "for" "for ")
                                         ;; (cons "while" "while ")
@@ -1511,10 +1515,12 @@ _ALIST is ignored."
                                         (cons "new" "new ")
                                         (cons "type" "type ")
                                         (cons "interface" "interface ")
+                                        (cons "return" "return ")
                                         )
   (add-hook 'js-mode-hook 'electric-operator-mode)
   ;; (add-hook 'js-mode-hook 'electric-layout-mode)
-  (add-hook 'js-mode-hook 'electric-pair-mode))
+  (add-hook 'js-mode-hook 'electric-pair-mode)
+  )
 
 (defun lang-javascript ()
   "Configure javascript mode."
