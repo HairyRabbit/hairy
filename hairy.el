@@ -1809,3 +1809,5 @@ _ALIST is ignored."
 ;; feature: auto restart server when config changed.
 ;; feature: list deps
 ;; (start-process "webpack-dev-server" "WebpackDevServer" "yarn" "webpack-dev-server" "--hot")
+;; BUGFIX: electric-mode
+;; BUGFIX: js-jsx-mode indent for inline express.
