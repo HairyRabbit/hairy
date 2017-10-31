@@ -1501,7 +1501,7 @@ _ALIST is ignored."
 (defun configure-electric-operator ()
   "Configure electric operator."
   (require-or-install 'electric-operator)
-  (electric-operator-add-rules-for-mode 'js-mode
+  (electric-operator-add-rules-for-mode 'rjsx-mode
                                         (cons "let"   "let ")
                                         (cons "const" "const ")
                                         (cons "var"   "var ")
@@ -1512,8 +1512,8 @@ _ALIST is ignored."
                                         ;; (cons "while" "while ")
                                         (cons "switch" "switch ")
                                         (cons "case" "case ")
-                                        (cons "new" "new ")
-                                        (cons "type" "type ")
+                                        ;; (cons "new" "new ")
+                                        ;; (cons "type" "type ")
                                         (cons "interface" "interface ")
                                         (cons "return" "return ")
                                         )
@@ -1530,6 +1530,75 @@ _ALIST is ignored."
   (configure-json-mode)
   (configure-electric-operator)
   ;; Templates
+  ;; js2-mode
+  (require-or-install 'js2-mode)
+  (require-or-install 'rjsx-mode)
+  (add-to-list 'auto-mode-alist '("\\.js\\'" . rjsx-mode))
+  (add-to-list 'auto-mode-alist '("\\.jsx\\'" . rjsx-mode))
+  (add-to-list 'interpreter-mode-alist '("node" . rjsx-mode))
+  (add-to-list 'interpreter-mode-alist '("node" . rjsx-mode))
+  ;; (setq js2-ignored-warnings t)
+  ;; (setq js2-mode-show-parse-errors nil)
+  ;; (setq js2-mode-show-strict-warnings nil)
+  ;; (setq js2-strict-trailing-comma-warning nil)
+  ;; (setq js2-strict-missing-semi-warning nil)
+  ;; (setq js2-missing-semi-one-line-override nil)
+  ;; (setq js2-strict-inconsistent-return-warning nil)
+  ;; (setq js2-strict-cond-assign-warning nil)
+  ;; (setq js2-strict-var-redeclaration-warning nil)
+  ;; (setq js2-strict-var-hides-function-arg-warning nil)
+  ;; (setq js2-highlight-level 3)
+  ;; (setq js2-mode-dev-mode-p t)
+  ;; (setq js2-include-jslint-globals nil)
+
+  ;; js2-refactor
+  (add-hook 'js2-mode-hook #'js2-refactor-mode)
+  (js2r-add-keybindings-with-prefix "C-c C-c")
+  (setq js2-skip-preprocessor-directives t)
+
+  (add-to-list 'js2-additional-externs '("boolean"
+                                         "number"
+                                         "string"
+                                         "null"
+                                         "void"
+                                         "any"
+                                         "mixed"))
+
+  (defun js2-parse-type-alias ()
+    "Parse `type Foo = <type-def>` type aliases."
+    (let ((pos (js2-current-token-beg)))
+      (when (js2-match-token js2-NAME)
+        (let ((name (js2-create-name-node nil)))
+          (if (not (js2-match-token js2-ASSIGN))
+              (progn
+                (js2-report-error "msg.syntax")
+                (make-js2-error-node))
+            (let* ((flow-js2-parsing-type-alias-p t)
+                   (typespec (js2-parse-flow-type-spec))
+                   (alias (make-js2-flow-type-alias-node :pos pos
+                                                         :type-name name :typespec typespec)))
+              (js2-node-add-children typespec name alias)
+              alias))))))
+
+  (define-advice js2-parse-name-or-label
+      (:around (fn) nil nil)
+    (if (string-equal (js2-current-token-string) "type")
+        (js2-parse-type-alias)
+      (funcall fn))
+    )
+
+  (define-advice js2-parse-import-clause
+      (:around (fn) nil nil)
+    (when (or (js2-match-contextual-kwd "type")
+              (js2-match-token js2-TYPEOF))
+      t)
+    (funcall fn))
+
+  (define-advice js2-parse-export
+      (:around (fn) nil nil)
+    (if (js2-match-contextual-kwd "type")
+        (js2-parse-type-alias)
+      (funcall fn)))
   )
 
 (deftask javascript
