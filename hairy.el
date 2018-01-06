@@ -996,7 +996,7 @@ module.exports = function (env) {
   (mouse-avoidance-mode 'animate)
   (setq column-number-mode t)
   (set-face-attribute 'default nil
-                      :font "Consolas 12"
+                      :font "Consolas 10"
                       :foreground "#372620"
                       :background "FloralWhite")
   (set-face-attribute 'fringe nil
@@ -1008,8 +1008,9 @@ module.exports = function (env) {
   (setq fill-column 80)
   (setq-default fci-rule-column 80)
   (setq-default indent-tabs-mode nil)
-  (require-or-install 'aggressive-indent)
-  (global-aggressive-indent-mode 1))
+  ;; (require-or-install 'aggressive-indent)
+  ;; (global-aggressive-indent-mode 1)
+  )
 
 ;; (defun neotree-projectile ()
 ;;   "Open neotree with projectile as root and open node for current file.
@@ -1516,19 +1517,20 @@ _ALIST is ignored."
                                         ;; (cons "type" "type ")
                                         (cons "interface" "interface ")
                                         (cons "return" "return ")
+                                        (cons "im", "import ")
                                         )
-  (add-hook 'js-mode-hook 'electric-operator-mode)
+  ;; (add-hook 'js-mode-hook 'electric-operator-mode)
   ;; (add-hook 'js-mode-hook 'electric-layout-mode)
-  (add-hook 'js-mode-hook 'electric-pair-mode)
+  ;; (add-hook 'js-mode-hook 'electric-pair-mode)
   )
 
 (defun lang-javascript ()
   "Configure javascript mode."
   ;; Nodejs-repl
-  (configure-nodejs-repl)
+  ;; (configure-nodejs-repl)
   ;; Json
   (configure-json-mode)
-  (configure-electric-operator)
+  ;; (configure-electric-operator)
   ;; Templates
   ;; js2-mode
   (require-or-install 'js2-mode)
@@ -1537,6 +1539,10 @@ _ALIST is ignored."
   (add-to-list 'auto-mode-alist '("\\.jsx\\'" . rjsx-mode))
   (add-to-list 'interpreter-mode-alist '("node" . rjsx-mode))
   (add-to-list 'interpreter-mode-alist '("node" . rjsx-mode))
+  (add-hook 'js-mode-hook
+            (lambda ()
+              (setq js-switch-indent-offset js-indent-level)
+              ))
   ;; (setq js2-ignored-warnings t)
   ;; (setq js2-mode-show-parse-errors nil)
   ;; (setq js2-mode-show-strict-warnings nil)
@@ -1554,51 +1560,17 @@ _ALIST is ignored."
   ;; js2-refactor
   (add-hook 'js2-mode-hook #'js2-refactor-mode)
   (js2r-add-keybindings-with-prefix "C-c C-c")
-  (setq js2-skip-preprocessor-directives t)
+  (setq js2-highlight-level 3)
+  ;; (setq js2-skip-preprocessor-directives t
+  ;;       js2-allow-rhino-new-expr-initializer nil)
 
-  (add-to-list 'js2-additional-externs '("boolean"
-                                         "number"
-                                         "string"
-                                         "null"
-                                         "void"
-                                         "any"
-                                         "mixed"))
-
-  (defun js2-parse-type-alias ()
-    "Parse `type Foo = <type-def>` type aliases."
-    (let ((pos (js2-current-token-beg)))
-      (when (js2-match-token js2-NAME)
-        (let ((name (js2-create-name-node nil)))
-          (if (not (js2-match-token js2-ASSIGN))
-              (progn
-                (js2-report-error "msg.syntax")
-                (make-js2-error-node))
-            (let* ((flow-js2-parsing-type-alias-p t)
-                   (typespec (js2-parse-flow-type-spec))
-                   (alias (make-js2-flow-type-alias-node :pos pos
-                                                         :type-name name :typespec typespec)))
-              (js2-node-add-children typespec name alias)
-              alias))))))
-
-  (define-advice js2-parse-name-or-label
-      (:around (fn) nil nil)
-    (if (string-equal (js2-current-token-string) "type")
-        (js2-parse-type-alias)
-      (funcall fn))
-    )
-
-  (define-advice js2-parse-import-clause
-      (:around (fn) nil nil)
-    (when (or (js2-match-contextual-kwd "type")
-              (js2-match-token js2-TYPEOF))
-      t)
-    (funcall fn))
-
-  (define-advice js2-parse-export
-      (:around (fn) nil nil)
-    (if (js2-match-contextual-kwd "type")
-        (js2-parse-type-alias)
-      (funcall fn)))
+  ;; (add-to-list 'js2-additional-externs '("boolean"
+  ;;                                        "number"
+  ;;                                        "string"
+  ;;                                        "null"
+  ;;                                        "void"
+  ;;                                        "any"
+  ;;                                        "mixed"))
   )
 
 (deftask javascript
