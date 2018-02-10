@@ -1330,13 +1330,15 @@ _ALIST is ignored."
   (require-or-install 'yasnippet)
   (yas-global-mode 1)
   (require-or-install 'company)
+  (require-or-install 'company-lsp)
   (global-company-mode)
-  ;;(eval-)
   (eval-after-load 'company
     '(progn
        (bind-company-keymaps)
        (setq company-require-match nil)
-       (setq company-auto-complete t))))
+       (setq company-auto-complete t)
+       ;; (push 'company-lsp company-backends)
+       )))
 
 (defun configure-jump ()
   "Fast move and jump."
@@ -1416,6 +1418,13 @@ _ALIST is ignored."
   (require-or-install 'eshell-prompt-extras)
   (setq eshell-highlight-prompt nil
         eshell-prompt-function 'epe-theme-lambda)
+  (setq eshell-load-hook
+      (lambda ()
+        (ansi-color-for-comint-mode-on)
+        (add-to-list
+         'comint-preoutput-filter-functions
+         (lambda (output)
+           (replace-regexp-in-string "\033\\[[0-9]+[GK]" "" output)))))
 
   (with-eval-after-load 'em-alias
     ;; commons
@@ -1541,36 +1550,25 @@ _ALIST is ignored."
   (add-to-list 'interpreter-mode-alist '("node" . rjsx-mode))
   (add-hook 'js-mode-hook
             (lambda ()
-              (setq js-switch-indent-offset js-indent-level)
-              ))
-  ;; (setq js2-ignored-warnings t)
-  ;; (setq js2-mode-show-parse-errors nil)
-  ;; (setq js2-mode-show-strict-warnings nil)
-  ;; (setq js2-strict-trailing-comma-warning nil)
-  ;; (setq js2-strict-missing-semi-warning nil)
-  ;; (setq js2-missing-semi-one-line-override nil)
-  ;; (setq js2-strict-inconsistent-return-warning nil)
-  ;; (setq js2-strict-cond-assign-warning nil)
-  ;; (setq js2-strict-var-redeclaration-warning nil)
-  ;; (setq js2-strict-var-hides-function-arg-warning nil)
-  ;; (setq js2-highlight-level 3)
-  ;; (setq js2-mode-dev-mode-p t)
-  ;; (setq js2-include-jslint-globals nil)
+              (setq js-switch-indent-offset js-indent-level)))
 
   ;; js2-refactor
   (add-hook 'js2-mode-hook #'js2-refactor-mode)
-  (js2r-add-keybindings-with-prefix "C-c C-c")
-  (setq js2-highlight-level 3)
-  ;; (setq js2-skip-preprocessor-directives t
-  ;;       js2-allow-rhino-new-expr-initializer nil)
 
-  ;; (add-to-list 'js2-additional-externs '("boolean"
-  ;;                                        "number"
-  ;;                                        "string"
-  ;;                                        "null"
-  ;;                                        "void"
-  ;;                                        "any"
-  ;;                                        "mixed"))
+  ;; lsp-mode
+  ;; (require-or-install 'lsp-mode)
+  ;; (lsp-define-stdio-client
+  ;;  lsp-javascript-flow "flow"
+  ;;  (lsp-make-traverser #'(lambda (dir)
+  ;;                          (directory-files dir nil "package.json")))
+  ;;  '("flow-language-server.cmd" "--stdio"))
+
+  ;; (add-hook 'js2-mode-hook #'lsp-javascript-flow-enable)
+  ;; (require-or-install 'lsp-ui)
+  ;; (add-hook 'lsp-mode-hook 'lsp-ui-mode)
+  (js2r-add-keybindings-with-prefix "C-c C-c")
+  (setq js2-strict-missing-semi-warning nil
+        js2-missing-semi-one-line-override t)
   )
 
 (deftask javascript
