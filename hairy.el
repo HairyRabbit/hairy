@@ -1,6 +1,6 @@
 ;;; hairy.el --- Hairy Rabbit  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2017 by Rabbit
+;; Copyright (C) 2017-2018 by Rabbit
 
 ;; Author: Rabbit
 ;; URL: https://github.com/yuffiy/hairy
@@ -1841,7 +1841,6 @@ _ALIST is ignored."
 ;; + yasnippet (ELPA)
 
 ;;; hairy.el ends here
-
 
 ;; (f-write (symbol-value (intern-soft "hairy-projectile/template-.gitignore"))
 ;;          'utf-8
