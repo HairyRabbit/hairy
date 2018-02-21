@@ -2,13 +2,17 @@
 
 ;; Copyright (C) 2017-2018 by Rabbit
 
-;; Author: Rabbit
-;; URL: https://github.com/yuffiy/hairy
+;; Author: HairyRabbit
+;; URL: https://github.com/HairyRabbit/hairy
 ;; Version: 0.0.1
 ;; Keywords: Hairy
 ;; Package-Requires: ((emacs "25.3"))
 
 ;;; Code:
+
+(require 'hairy-package)
+(require 'hairy-yasnippet)
+(require 'hairy-company)
 
 ;;;; Application
 (defconst hairy/app-name "Hairy"
@@ -55,58 +59,6 @@
   "Make millisec number"
   (timer-duration (concat (number-to-string num) "millisec")))
 
-;;;; Packages
-(defvar package-source-melpa-usestable nil
-  "Use MELPA stable library.")
-
-(defvar package-source-use-image t
-  "Use package source images.")
-
-(defvar package-source-protocol "http://"
-  "Use https:// or http://")
-
-(defun configure-package-sources ()
-  "Configure package sources.
-
-* [Elpa](https://elpa.gnu.org/) - Default
-* [Melpa](https://melpa.org/)   - Popular
-"
-  (let* ((elpa               `("gnu" .
-                               ,(concat package-source-protocol
-                                        "elpa.gnu.org/packages/")))
-	 (elpa-image         `("gun" .
-                               ,(concat package-source-protocol
-                                        "elpa.emacs-china.org/gnu/")))
-	 (melpa-stable       `("melpa-stable" .
-                               ,(concat package-source-protocol
-                                        "stable.melpa.org/packages/")))
-	 (melpa-stable-image `("melpa-stable" .
-                               ,(concat package-source-protocol
-                                        "elpa.emacs-china.org/melpa-stable/")))
-	 (melpa              `("melpa" .
-                               ,(concat package-source-protocol
-                                        "melpa.org/packages/")))
-	 (melpa-image        `("melpa" .
-                               ,(concat package-source-protocol
-                                        "elpa.emacs-china.org/melpa/"))))
-    (if (not package-source-use-image)
-	(list elpa
-	      (if package-source-melpa-usestable melpa-stable melpa))
-      (list elpa-image
-	    (if package-source-melpa-usestable melpa-stable-image melpa-image)))))
-
-(defun reset-package-source ()
-  "Reset package source."
-  (interactive)
-  (setq package-archives (configure-package-sources))
-  (package-initialize))
-
-(defun require-or-install (feature &optional filename)
-  "Install package when require failed."
-  (unless (funcall 'require feature filename t)
-    (progn
-      (package-install feature nil)
-      (funcall 'require feature filename))))
 
 ;;;; Commmands
 (defvar emacs-maximize-p nil
@@ -134,39 +86,6 @@
 (defun set-font-color (str color)
   "Set font color."
   (propertize str 'face `((:foreground ,color))))
-
-
-;;;; Package manager
-;; TODO check package upgrade
-;; TODO fetch timeout
-(deftask hairy/configure-package
-  "Apply package configs."
-  (require 'package)
-  (reset-package-source)
-  (setq package-check-signature nil)
-  (unless (or (package-installed-p 'dash)
-              (package-installed-p 'projectile))
-    (package-refresh-contents))
-  (global-set-key (kbd "C-c C-p l") 'package-list-packages-no-fetch)
-  (global-set-key (kbd "C-c C-p r") 'reset-package-source)
-  (global-set-key (kbd "C-c C-p i") 'package-install))
-
-;; (deftask-delay hairy/upgrade-library
-;;   "Upgrade library."
-;;   (package-refresh-contents t)
-;;   (with-current-buffer (get-buffer-create "*Packages*")
-;;     (package-menu-mode)
-;;     (package-menu-refresh)
-;;     (package-menu--generate nil t)
-;;     (package-menu-mark-upgrades)))
-
-;;;; Preload librarys.
-(deftask preload-library
-  "Preload utils library"
-  (require-or-install 'dash)
-  (require-or-install 's)
-  (require-or-install 'f)
-  (eval-after-load 'dash (dash-enable-font-lock)))
 
 ;;;; Default base
 (defun hairy/text-scaled-size (str face)
@@ -995,14 +914,14 @@ module.exports = function (env) {
   (setq frame-title-format "emacs@%b")
   (mouse-avoidance-mode 'animate)
   (setq column-number-mode t)
-  (set-face-attribute 'default nil
-                      :font "Consolas 10"
-                      :foreground "#372620"
-                      :background "FloralWhite")
-  (set-face-attribute 'fringe nil
-                      :foreground (face-foreground 'default)
-                      :background (face-background 'default))
-  (set-face-foreground 'vertical-border "#F7F2E9")
+  ;; (set-face-attribute 'default nil
+  ;;                     :font "Consolas 10"
+  ;;                     :foreground "#372620"
+  ;;                     :background "FloralWhite")
+  ;; (set-face-attribute 'fringe nil
+  ;;                     :foreground (face-foreground 'default)
+  ;;                     :background (face-background 'default))
+  ;; (set-face-foreground 'vertical-border "#F7F2E9")
   (require-or-install 'fill-column-indicator)
   (fci-mode 1)
   (setq fill-column 80)
@@ -1310,36 +1229,6 @@ _ALIST is ignored."
   ;; TODO auto fill parens in block
   )
 
-(defun configure-insert-delete ()
-  "Fast insert/delete line word and anything."
-  (autoload 'zap-up-to-char "misc" "Kill up" t)
-  (global-set-key (kbd "M-z") 'zap-up-to-char))
-
-(defun bind-company-keymaps ()
-  "Binding company mode keymaps."
-  (define-key company-active-map (kbd "TAB") 'company-complete-common-or-cycle)
-  (define-key company-active-map (kbd "S-TAB") 'company-select-previous))
-
-(defun configure-complition ()
-  "Fast complite code.
-1. Company
-2. Yasnippet
-3. Abbr
-"
-  (global-set-key (kbd "M-/") 'hippie-expand)
-  (require-or-install 'yasnippet)
-  (yas-global-mode 1)
-  (require-or-install 'company)
-  (require-or-install 'company-lsp)
-  (global-company-mode)
-  (eval-after-load 'company
-    '(progn
-       (bind-company-keymaps)
-       (setq company-require-match nil)
-       (setq company-auto-complete t)
-       ;; (push 'company-lsp company-backends)
-       )))
-
 (defun configure-jump ()
   "Fast move and jump."
   (require-or-install 'mwim)
@@ -1386,11 +1275,10 @@ _ALIST is ignored."
   (configure-whitespace)
   (configure-region)
   (configure-parens)
-  (configure-insert-delete))
+  )
 
 (deftask fastcoding-delay
   ""
-  (run-with-timer (ms 100) nil 'configure-complition)
   (run-with-timer (ms 100) nil 'configure-jump))
 
 
@@ -1553,7 +1441,7 @@ _ALIST is ignored."
               (setq js-switch-indent-offset js-indent-level)))
 
   ;; js2-refactor
-  (add-hook 'js2-mode-hook #'js2-refactor-mode)
+  ;; (add-hook 'js2-mode-hook #'js2-refactor-mode)
 
   ;; lsp-mode
   ;; (require-or-install 'lsp-mode)
@@ -1566,7 +1454,7 @@ _ALIST is ignored."
   ;; (add-hook 'js2-mode-hook #'lsp-javascript-flow-enable)
   ;; (require-or-install 'lsp-ui)
   ;; (add-hook 'lsp-mode-hook 'lsp-ui-mode)
-  (js2r-add-keybindings-with-prefix "C-c C-c")
+  ;; (js2r-add-keybindings-with-prefix "C-c C-c")
   (setq js2-strict-missing-semi-warning nil
         js2-missing-semi-one-line-override t)
   )
@@ -1601,6 +1489,8 @@ _ALIST is ignored."
   "Apply javascript-IDE configs."
   (run-with-timer (ms 100) nil 'lang-ahk))
 
+
+(provide 'hairy)
 
 ;; + ac-alchemist (ELPA)
 ;; + ace-link (ELPA)
